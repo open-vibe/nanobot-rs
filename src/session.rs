@@ -90,14 +90,12 @@ impl SessionManager {
         }
 
         let mut lines = Vec::new();
-        lines.push(
-            serde_json::to_string(&json!({
-                "_type": "metadata",
-                "created_at": session.created_at.to_rfc3339(),
-                "updated_at": session.updated_at.to_rfc3339(),
-                "metadata": session.metadata,
-            }))?,
-        );
+        lines.push(serde_json::to_string(&json!({
+            "_type": "metadata",
+            "created_at": session.created_at.to_rfc3339(),
+            "updated_at": session.updated_at.to_rfc3339(),
+            "metadata": session.metadata,
+        }))?);
 
         for msg in &session.messages {
             lines.push(serde_json::to_string(msg)?);
@@ -124,11 +122,15 @@ impl SessionManager {
 
     fn load(&self, key: &str) -> Result<Session> {
         let path = self.session_path(key);
-        let content =
-            std::fs::read_to_string(&path).with_context(|| format!("failed reading {}", path.display()))?;
+        let content = std::fs::read_to_string(&path)
+            .with_context(|| format!("failed reading {}", path.display()))?;
 
         let mut session = Session::new(key);
-        for line in content.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        for line in content
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+        {
             let value: Value = serde_json::from_str(line)?;
             if value.get("_type").and_then(Value::as_str) == Some("metadata") {
                 if let Some(raw) = value.get("created_at").and_then(Value::as_str) {

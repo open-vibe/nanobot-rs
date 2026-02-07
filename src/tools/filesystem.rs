@@ -132,7 +132,10 @@ impl Tool for WriteFileTool {
             tokio::fs::create_dir_all(parent).await?;
         }
         tokio::fs::write(&resolved, content).await?;
-        Ok(format!("Successfully wrote {} bytes to {path}", content.len()))
+        Ok(format!(
+            "Successfully wrote {} bytes to {path}",
+            content.len()
+        ))
     }
 }
 
@@ -180,7 +183,9 @@ impl Tool for EditFileTool {
 
         let content = tokio::fs::read_to_string(&resolved).await?;
         if !content.contains(old_text) {
-            return Ok("Error: old_text not found in file. Make sure it matches exactly.".to_string());
+            return Ok(
+                "Error: old_text not found in file. Make sure it matches exactly.".to_string(),
+            );
         }
         let count = content.matches(old_text).count();
         if count > 1 {

@@ -295,8 +295,10 @@ pub fn load_config(config_path: Option<&Path>) -> Result<Config> {
         return Ok(Config::default());
     }
 
-    let raw = std::fs::read_to_string(&path).with_context(|| format!("failed to read config: {}", path.display()))?;
-    let mut value: Value = serde_json::from_str(&raw).with_context(|| format!("invalid JSON in {}", path.display()))?;
+    let raw = std::fs::read_to_string(&path)
+        .with_context(|| format!("failed to read config: {}", path.display()))?;
+    let mut value: Value = serde_json::from_str(&raw)
+        .with_context(|| format!("invalid JSON in {}", path.display()))?;
     migrate_config(&mut value);
     let config = serde_json::from_value(value).context("failed to parse config structure")?;
     Ok(config)

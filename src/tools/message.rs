@@ -61,18 +61,25 @@ impl Tool for MessageTool {
             .and_then(Value::as_str)
             .ok_or_else(|| anyhow!("missing required string field: content"))?;
 
-        let explicit_channel = params.get("channel").and_then(Value::as_str).map(ToOwned::to_owned);
-        let explicit_chat_id = params.get("chat_id").and_then(Value::as_str).map(ToOwned::to_owned);
+        let explicit_channel = params
+            .get("channel")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned);
+        let explicit_chat_id = params
+            .get("chat_id")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned);
 
-        let (channel, chat_id) = if let (Some(channel), Some(chat_id)) = (explicit_channel, explicit_chat_id) {
-            (channel, chat_id)
-        } else {
-            let guard = self
-                .context
-                .lock()
-                .map_err(|_| anyhow!("failed to lock message tool context"))?;
-            (guard.channel.clone(), guard.chat_id.clone())
-        };
+        let (channel, chat_id) =
+            if let (Some(channel), Some(chat_id)) = (explicit_channel, explicit_chat_id) {
+                (channel, chat_id)
+            } else {
+                let guard = self
+                    .context
+                    .lock()
+                    .map_err(|_| anyhow!("failed to lock message tool context"))?;
+                (guard.channel.clone(), guard.chat_id.clone())
+            };
 
         if channel.is_empty() || chat_id.is_empty() {
             return Ok("Error: No target channel/chat specified".to_string());

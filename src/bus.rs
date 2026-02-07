@@ -16,7 +16,12 @@ pub struct InboundMessage {
 }
 
 impl InboundMessage {
-    pub fn new(channel: impl Into<String>, sender_id: impl Into<String>, chat_id: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(
+        channel: impl Into<String>,
+        sender_id: impl Into<String>,
+        chat_id: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self {
             channel: channel.into(),
             sender_id: sender_id.into(),
@@ -44,7 +49,11 @@ pub struct OutboundMessage {
 }
 
 impl OutboundMessage {
-    pub fn new(channel: impl Into<String>, chat_id: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(
+        channel: impl Into<String>,
+        chat_id: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self {
             channel: channel.into(),
             chat_id: chat_id.into(),

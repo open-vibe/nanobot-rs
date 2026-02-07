@@ -67,7 +67,10 @@ impl ExecTool {
         for pattern in &self.deny_patterns {
             if let Ok(re) = Regex::new(pattern) {
                 if re.is_match(&lower) {
-                    return Some("Error: Command blocked by safety guard (dangerous pattern detected)".to_string());
+                    return Some(
+                        "Error: Command blocked by safety guard (dangerous pattern detected)"
+                            .to_string(),
+                    );
                 }
             }
         }
@@ -79,13 +82,17 @@ impl ExecTool {
                     .unwrap_or(false)
             });
             if !allowed {
-                return Some("Error: Command blocked by safety guard (not in allowlist)".to_string());
+                return Some(
+                    "Error: Command blocked by safety guard (not in allowlist)".to_string(),
+                );
             }
         }
 
         if self.restrict_to_workspace {
             if lower.contains("..\\") || lower.contains("../") {
-                return Some("Error: Command blocked by safety guard (path traversal detected)".to_string());
+                return Some(
+                    "Error: Command blocked by safety guard (path traversal detected)".to_string(),
+                );
             }
 
             let cwd = normalize_path(cwd);
@@ -109,7 +116,10 @@ impl ExecTool {
             for raw in win_paths.into_iter().chain(posix_paths) {
                 let p = normalize_path(Path::new(&raw));
                 if !p.starts_with(&cwd) && p != cwd {
-                    return Some("Error: Command blocked by safety guard (path outside working dir)".to_string());
+                    return Some(
+                        "Error: Command blocked by safety guard (path outside working dir)"
+                            .to_string(),
+                    );
                 }
             }
         }
@@ -170,7 +180,12 @@ impl Tool for ExecTool {
         let output = timeout(Duration::from_secs(self.timeout_s), process.output()).await;
         let output = match output {
             Ok(result) => result?,
-            Err(_) => return Ok(format!("Error: Command timed out after {} seconds", self.timeout_s)),
+            Err(_) => {
+                return Ok(format!(
+                    "Error: Command timed out after {} seconds",
+                    self.timeout_s
+                ));
+            }
         };
 
         let mut output_parts = Vec::new();

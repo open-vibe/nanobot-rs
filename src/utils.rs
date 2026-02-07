@@ -7,7 +7,8 @@ pub fn ensure_dir(path: &Path) -> std::io::Result<PathBuf> {
 }
 
 pub fn get_data_path() -> std::io::Result<PathBuf> {
-    let home = dirs::home_dir().ok_or_else(|| std::io::Error::other("cannot resolve home directory"))?;
+    let home =
+        dirs::home_dir().ok_or_else(|| std::io::Error::other("cannot resolve home directory"))?;
     ensure_dir(&home.join(".nanobot"))
 }
 
@@ -24,7 +25,8 @@ pub fn get_workspace_path(workspace: Option<&str>) -> std::io::Result<PathBuf> {
     let path = match workspace {
         Some(p) => expand_tilde(p),
         None => {
-            let home = dirs::home_dir().ok_or_else(|| std::io::Error::other("cannot resolve home directory"))?;
+            let home = dirs::home_dir()
+                .ok_or_else(|| std::io::Error::other("cannot resolve home directory"))?;
             home.join(".nanobot").join("workspace")
         }
     };

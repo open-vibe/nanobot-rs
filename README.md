@@ -1,40 +1,46 @@
 # nanobot-rs
 
-`nanobot` 的 Rust 移植版（首版）。
+`nanobot-rs` 是对原 `nanobot` 的 Rust 完整移植版本，目标是保留原有工作流和工具能力，同时提供更稳定的并发与部署体验。
 
-## 已移植模块
+## 特性
 
-- 配置系统：`~/.nanobot/config.json` 读写、`camelCase` 序列化、基础迁移逻辑
-- 消息总线：`InboundMessage` / `OutboundMessage` / async 队列
-- 会话管理：JSONL 持久化会话
-- Memory：`memory/MEMORY.md` 与当日日志读取
-- Agent 核心循环：LLM 调用 + tool call 执行闭环
-- Provider：OpenAI-compatible Chat Completions 接口
+- Agent 主循环：LLM 调用、工具调用、会话上下文、错误恢复
+- 配置系统：`~/.nanobot/config.json`，支持 provider 自动匹配
+- 会话与记忆：JSONL 会话持久化 + `memory/MEMORY.md`
 - 工具系统：
-  - `read_file`
-  - `write_file`
-  - `edit_file`
-  - `list_dir`
+  - `read_file` / `write_file` / `edit_file` / `list_dir`
   - `exec`
-  - `web_search`（Brave API）
-  - `web_fetch`
-  - `message`
-- 参数校验：对齐原 Python 的 schema 校验语义（含测试）
+  - `web_search` / `web_fetch`
+  - `message` / `spawn` / `cron`
+- 定时任务与心跳：
+  - `CronService`（add/list/remove/enable/run + 持久化）
+  - `HeartbeatService`
+- 多渠道接入：
+  - Telegram（long polling，支持媒体下载与语音转写）
+  - Discord（Gateway + REST，支持 typing 指示）
+  - WhatsApp（Node bridge）
+  - Feishu（REST 发送；WebSocket 接收可选特性）
+- 内置 skills：同步原项目 `skills/*`
 
-## 当前未移植
+## 环境要求
 
-- Telegram / Discord / WhatsApp / Feishu channel 适配层
-- Cron 服务与 heartbeat
-- 子代理（spawn）
-- 技能元数据解析与自动装载（当前仅保留基础系统提示拼装）
+- Rust stable（建议 1.85+）
+- 可选：
+  - Node.js 18+（WhatsApp bridge 登录）
+  - Brave Search API Key（`web_search`）
+  - Groq API Key（语音转写）
 
 ## 快速开始
+
+### 1. 初始化
 
 ```bash
 cargo run -- onboard
 ```
 
-编辑配置 `~/.nanobot/config.json`，至少设置一个可用 API Key，例如：
+### 2. 配置 API Key
+
+编辑 `~/.nanobot/config.json`，最小配置示例：
 
 ```json
 {
@@ -51,26 +57,65 @@ cargo run -- onboard
 }
 ```
 
-单次对话：
+### 3. 直接对话
 
 ```bash
-cargo run -- agent -m "What is 2+2?"
+cargo run -- agent -m "Hello"
 ```
 
-交互模式：
+### 4. 启动网关
 
 ```bash
-cargo run -- agent
+cargo run -- gateway
 ```
 
-查看状态：
+## 常用命令
 
 ```bash
+# 状态与版本
 cargo run -- status
+cargo run -- version
+
+# 交互模式
+cargo run -- agent
+
+# 渠道
+cargo run -- channels status
+cargo run -- channels login
+
+# 定时任务
+cargo run -- cron list
+cargo run -- cron add -n daily -m "Good morning" --cron "0 9 * * *"
+cargo run -- cron enable <job_id>
+cargo run -- cron run <job_id>
+cargo run -- cron remove <job_id>
 ```
+
+## Feishu WebSocket 接收
+
+默认构建下可正常发送消息。要启用 Feishu WebSocket 接收：
+
+```bash
+cargo run --features feishu-websocket -- gateway
+```
+
+## WhatsApp 登录
+
+`channels login` 会自动：
+
+- 准备 `~/.nanobot/bridge`
+- 执行 `npm install`
+- 执行 `npm run build`
+- 启动 bridge 并在终端展示二维码登录
 
 ## 开发
 
 ```bash
+cargo fmt
 cargo test
+cargo check --features feishu-websocket
 ```
+
+## License
+
+MIT

@@ -10,8 +10,10 @@ const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_2) AppleWebKit/537.36";
 
 fn strip_tags(text: &str) -> String {
-    let script_re = Regex::new(r"(?is)<script[\s\S]*?</script>").unwrap_or_else(|_| Regex::new("^$").expect("regex"));
-    let style_re = Regex::new(r"(?is)<style[\s\S]*?</style>").unwrap_or_else(|_| Regex::new("^$").expect("regex"));
+    let script_re = Regex::new(r"(?is)<script[\s\S]*?</script>")
+        .unwrap_or_else(|_| Regex::new("^$").expect("regex"));
+    let style_re = Regex::new(r"(?is)<style[\s\S]*?</style>")
+        .unwrap_or_else(|_| Regex::new("^$").expect("regex"));
     let tag_re = Regex::new(r"(?is)<[^>]+>").unwrap_or_else(|_| Regex::new("^$").expect("regex"));
     let no_script = script_re.replace_all(text, "");
     let no_style = style_re.replace_all(&no_script, "");
@@ -83,7 +85,10 @@ impl Tool for WebSearchTool {
             .get("query")
             .and_then(Value::as_str)
             .ok_or_else(|| anyhow!("missing required string field: query"))?;
-        let count = params.get("count").and_then(Value::as_u64).unwrap_or(self.max_results as u64);
+        let count = params
+            .get("count")
+            .and_then(Value::as_u64)
+            .unwrap_or(self.max_results as u64);
         let n = count.clamp(1, 10);
 
         let client = reqwest::Client::new();
@@ -170,7 +175,9 @@ impl Tool for WebFetchTool {
             .and_then(Value::as_str)
             .ok_or_else(|| anyhow!("missing required string field: url"))?;
         if let Err(err) = validate_url(url) {
-            return Ok(json!({"error": format!("URL validation failed: {err}"), "url": url}).to_string());
+            return Ok(
+                json!({"error": format!("URL validation failed: {err}"), "url": url}).to_string(),
+            );
         }
 
         let extract_mode = params
@@ -187,7 +194,11 @@ impl Tool for WebFetchTool {
             .redirect(reqwest::redirect::Policy::limited(5))
             .timeout(std::time::Duration::from_secs(30))
             .build()?;
-        let response = client.get(url).header(USER_AGENT, DEFAULT_USER_AGENT).send().await?;
+        let response = client
+            .get(url)
+            .header(USER_AGENT, DEFAULT_USER_AGENT)
+            .send()
+            .await?;
         let final_url = response.url().to_string();
         let status = response.status().as_u16();
         let content_type = response
@@ -207,7 +218,9 @@ impl Tool for WebFetchTool {
             )
         } else if content_type.contains("text/html")
             || body[..body.len().min(256)].to_lowercase().contains("<html")
-            || body[..body.len().min(256)].to_lowercase().contains("<!doctype")
+            || body[..body.len().min(256)]
+                .to_lowercase()
+                .contains("<!doctype")
         {
             let extracted = if extract_mode == "text" {
                 normalize_text(&strip_tags(&body))

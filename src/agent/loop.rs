@@ -1,11 +1,15 @@
 use crate::agent::context::ContextBuilder;
+use crate::agent::subagent::SubagentManager;
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
+use crate::cron::CronService;
 use crate::providers::base::LLMProvider;
 use crate::session::SessionManager;
+use crate::tools::cron::CronTool;
 use crate::tools::filesystem::{EditFileTool, ListDirTool, ReadFileTool, WriteFileTool};
 use crate::tools::message::MessageTool;
 use crate::tools::registry::ToolRegistry;
 use crate::tools::shell::ExecTool;
+use crate::tools::spawn::SpawnTool;
 use crate::tools::web::{WebFetchTool, WebSearchTool};
 use anyhow::Result;
 use serde_json::json;
@@ -24,6 +28,9 @@ pub struct AgentLoop {
     sessions: SessionManager,
     tools: ToolRegistry,
     message_tool: Arc<MessageTool>,
+    spawn_tool: Arc<SpawnTool>,
+    cron_tool: Option<Arc<CronTool>>,
+    subagents: Arc<SubagentManager>,
     running: AtomicBool,
 }
 
@@ -37,10 +44,12 @@ impl AgentLoop {
         brave_api_key: Option<String>,
         exec_timeout_s: u64,
         restrict_to_workspace: bool,
+        cron_service: Option<Arc<CronService>>,
     ) -> Result<Self> {
         let context = ContextBuilder::new(workspace.clone())?;
         let sessions = SessionManager::new()?;
         let mut tools = ToolRegistry::new();
+        let model_name = model.unwrap_or_else(|| provider.default_model().to_string());
 
         let allowed_dir = if restrict_to_workspace {
             Some(workspace.clone())
@@ -65,16 +74,39 @@ impl AgentLoop {
         let message_tool = Arc::new(MessageTool::new(bus.outbound_sender()));
         tools.register(message_tool.clone());
 
+        let subagents = Arc::new(SubagentManager::new(
+            provider.clone(),
+            workspace.clone(),
+            bus.clone(),
+            model_name.clone(),
+            None,
+            exec_timeout_s,
+            restrict_to_workspace,
+        ));
+        let spawn_tool = Arc::new(SpawnTool::new(subagents.clone()));
+        tools.register(spawn_tool.clone());
+
+        let cron_tool = if let Some(cron_service) = cron_service {
+            let tool = Arc::new(CronTool::new(cron_service));
+            tools.register(tool.clone());
+            Some(tool)
+        } else {
+            None
+        };
+
         Ok(Self {
             bus,
             provider: provider.clone(),
             workspace,
-            model: model.unwrap_or_else(|| provider.default_model().to_string()),
+            model: model_name,
             max_iterations,
             context,
             sessions,
             tools,
             message_tool,
+            spawn_tool,
+            cron_tool,
+            subagents,
             running: AtomicBool::new(false),
         })
     }
@@ -115,11 +147,17 @@ impl AgentLoop {
         let mut session = self.sessions.get_or_create(&msg.session_key());
         self.message_tool
             .set_context(msg.channel.clone(), msg.chat_id.clone());
+        self.spawn_tool
+            .set_context(msg.channel.clone(), msg.chat_id.clone());
+        if let Some(cron_tool) = &self.cron_tool {
+            cron_tool.set_context(msg.channel.clone(), msg.chat_id.clone());
+        }
 
         let history = session.get_history(50);
         let mut messages = self.context.build_messages(
             &history,
             &msg.content,
+            None,
             Some(&msg.channel),
             Some(&msg.chat_id),
         );
@@ -129,13 +167,7 @@ impl AgentLoop {
             let tool_defs = self.tools.get_definitions();
             let response = self
                 .provider
-                .chat(
-                    &messages,
-                    Some(&tool_defs),
-                    Some(&self.model),
-                    4096,
-                    0.7,
-                )
+                .chat(&messages, Some(&tool_defs), Some(&self.model), 4096, 0.7)
                 .await?;
 
             if response.has_tool_calls() {
@@ -160,7 +192,10 @@ impl AgentLoop {
                 );
 
                 for tool_call in response.tool_calls {
-                    let result = self.tools.execute(&tool_call.name, &tool_call.arguments).await;
+                    let result = self
+                        .tools
+                        .execute(&tool_call.name, &tool_call.arguments)
+                        .await;
                     self.context.add_tool_result(
                         &mut messages,
                         &tool_call.id,
@@ -174,8 +209,9 @@ impl AgentLoop {
             }
         }
 
-        let answer = final_content
-            .unwrap_or_else(|| "I've completed processing but have no response to give.".to_string());
+        let answer = final_content.unwrap_or_else(|| {
+            "I've completed processing but have no response to give.".to_string()
+        });
 
         session.add_message("user", &msg.content);
         session.add_message("assistant", &answer);
@@ -193,12 +229,18 @@ impl AgentLoop {
 
         self.message_tool
             .set_context(origin_channel.clone(), origin_chat_id.clone());
+        self.spawn_tool
+            .set_context(origin_channel.clone(), origin_chat_id.clone());
+        if let Some(cron_tool) = &self.cron_tool {
+            cron_tool.set_context(origin_channel.clone(), origin_chat_id.clone());
+        }
 
         let session_key = format!("{origin_channel}:{origin_chat_id}");
         let mut session = self.sessions.get_or_create(&session_key);
         let mut messages = self.context.build_messages(
             &session.get_history(50),
             &msg.content,
+            None,
             Some(&origin_channel),
             Some(&origin_chat_id),
         );
@@ -208,13 +250,7 @@ impl AgentLoop {
             let tool_defs = self.tools.get_definitions();
             let response = self
                 .provider
-                .chat(
-                    &messages,
-                    Some(&tool_defs),
-                    Some(&self.model),
-                    4096,
-                    0.7,
-                )
+                .chat(&messages, Some(&tool_defs), Some(&self.model), 4096, 0.7)
                 .await?;
 
             if response.has_tool_calls() {
@@ -239,7 +275,10 @@ impl AgentLoop {
                 );
 
                 for tool_call in response.tool_calls {
-                    let result = self.tools.execute(&tool_call.name, &tool_call.arguments).await;
+                    let result = self
+                        .tools
+                        .execute(&tool_call.name, &tool_call.arguments)
+                        .await;
                     self.context.add_tool_result(
                         &mut messages,
                         &tool_call.id,
@@ -254,7 +293,10 @@ impl AgentLoop {
         }
 
         let answer = final_content.unwrap_or_else(|| "Background task completed.".to_string());
-        session.add_message("user", &format!("[System: {}] {}", msg.sender_id, msg.content));
+        session.add_message(
+            "user",
+            &format!("[System: {}] {}", msg.sender_id, msg.content),
+        );
         session.add_message("assistant", &answer);
         self.sessions.save(&session)?;
 
@@ -283,5 +325,9 @@ impl AgentLoop {
 
     pub fn workspace(&self) -> &PathBuf {
         &self.workspace
+    }
+
+    pub async fn running_subagents(&self) -> usize {
+        self.subagents.get_running_count().await
     }
 }

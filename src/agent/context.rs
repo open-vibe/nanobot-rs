@@ -1,4 +1,5 @@
 use crate::memory::MemoryStore;
+use crate::skills::SkillsLoader;
 use chrono::Local;
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -6,15 +7,21 @@ use std::path::PathBuf;
 pub struct ContextBuilder {
     workspace: PathBuf,
     memory: MemoryStore,
+    skills: SkillsLoader,
 }
 
 impl ContextBuilder {
     pub fn new(workspace: PathBuf) -> anyhow::Result<Self> {
         let memory = MemoryStore::new(workspace.clone())?;
-        Ok(Self { workspace, memory })
+        let skills = SkillsLoader::new(workspace.clone(), None);
+        Ok(Self {
+            workspace,
+            memory,
+            skills,
+        })
     }
 
-    pub fn build_system_prompt(&self) -> String {
+    pub fn build_system_prompt(&self, skill_names: Option<&[String]>) -> String {
         let mut parts = Vec::new();
 
         let now = Local::now().format("%Y-%m-%d %H:%M (%A)").to_string();
@@ -41,6 +48,30 @@ impl ContextBuilder {
             parts.push(format!("# Memory\n\n{memory_context}"));
         }
 
+        let always_skills = self.skills.get_always_skills();
+        if !always_skills.is_empty() {
+            let content = self.skills.load_skills_for_context(&always_skills);
+            if !content.is_empty() {
+                parts.push(format!("# Active Skills\n\n{content}"));
+            }
+        }
+
+        if let Some(skill_names) = skill_names {
+            if !skill_names.is_empty() {
+                let content = self.skills.load_skills_for_context(skill_names);
+                if !content.is_empty() {
+                    parts.push(format!("# Requested Skills\n\n{content}"));
+                }
+            }
+        }
+
+        let summary = self.skills.build_skills_summary();
+        if !summary.is_empty() {
+            parts.push(format!(
+                "# Skills\n\nThe following skills extend your capabilities. To use a skill, read its SKILL.md file using the read_file tool.\n\n{summary}"
+            ));
+        }
+
         parts.join("\n\n---\n\n")
     }
 
@@ -48,10 +79,11 @@ impl ContextBuilder {
         &self,
         history: &[Value],
         current_message: &str,
+        skill_names: Option<&[String]>,
         channel: Option<&str>,
         chat_id: Option<&str>,
     ) -> Vec<Value> {
-        let mut system_prompt = self.build_system_prompt();
+        let mut system_prompt = self.build_system_prompt(skill_names);
         if let (Some(channel), Some(chat_id)) = (channel, chat_id) {
             system_prompt.push_str(&format!(
                 "\n\n## Current Session\nChannel: {channel}\nChat ID: {chat_id}"

@@ -11,16 +11,14 @@ pub trait Tool: Send + Sync {
 
     fn validate_params(&self, params: &Map<String, Value>) -> Vec<String> {
         let schema = self.parameters();
-        let schema_type = schema.get("type").and_then(Value::as_str).unwrap_or("object");
+        let schema_type = schema
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("object");
         if schema_type != "object" {
             return vec![format!("schema for {} must be object type", self.name())];
         }
-        validate_value(
-            &Value::Object(params.clone()),
-            &schema,
-            "",
-            "parameter",
-        )
+        validate_value(&Value::Object(params.clone()), &schema, "", "parameter")
     }
 
     fn to_schema(&self) -> Value {
@@ -36,8 +34,15 @@ pub trait Tool: Send + Sync {
 }
 
 fn validate_value(value: &Value, schema: &Value, path: &str, fallback_label: &str) -> Vec<String> {
-    let schema_type = schema.get("type").and_then(Value::as_str).unwrap_or("object");
-    let label = if path.is_empty() { fallback_label } else { path };
+    let schema_type = schema
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("object");
+    let label = if path.is_empty() {
+        fallback_label
+    } else {
+        path
+    };
     let mut errors = Vec::new();
 
     match schema_type {
@@ -107,7 +112,12 @@ fn validate_value(value: &Value, schema: &Value, path: &str, fallback_label: &st
                         } else {
                             format!("{path}[{idx}]")
                         };
-                        errors.extend(validate_value(item, item_schema, &child_path, fallback_label));
+                        errors.extend(validate_value(
+                            item,
+                            item_schema,
+                            &child_path,
+                            fallback_label,
+                        ));
                     }
                 }
             } else {
@@ -140,7 +150,12 @@ fn validate_value(value: &Value, schema: &Value, path: &str, fallback_label: &st
                         } else {
                             format!("{path}.{key}")
                         };
-                        errors.extend(validate_value(item, prop_schema, &child_path, fallback_label));
+                        errors.extend(validate_value(
+                            item,
+                            prop_schema,
+                            &child_path,
+                            fallback_label,
+                        ));
                     }
                 }
             } else {
@@ -153,7 +168,10 @@ fn validate_value(value: &Value, schema: &Value, path: &str, fallback_label: &st
 
     if let Some(enums) = schema.get("enum").and_then(Value::as_array) {
         if !enums.iter().any(|candidate| candidate == value) {
-            errors.push(format!("{label} must be one of {}", Value::Array(enums.clone())));
+            errors.push(format!(
+                "{label} must be one of {}",
+                Value::Array(enums.clone())
+            ));
         }
     }
 
@@ -208,7 +226,10 @@ mod tests {
     #[test]
     fn validate_missing_required() {
         let tool = SampleTool;
-        let params = json!({ "query": "hi" }).as_object().cloned().unwrap_or_default();
+        let params = json!({ "query": "hi" })
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
         let errors = tool.validate_params(&params).join("; ");
         assert!(errors.contains("missing required count"));
     }
@@ -216,11 +237,17 @@ mod tests {
     #[test]
     fn validate_type_and_range() {
         let tool = SampleTool;
-        let params = json!({ "query": "hi", "count": 0 }).as_object().cloned().unwrap_or_default();
+        let params = json!({ "query": "hi", "count": 0 })
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
         let errors = tool.validate_params(&params);
         assert!(errors.iter().any(|e| e.contains("count must be >= 1")));
 
-        let params = json!({ "query": "hi", "count": "2" }).as_object().cloned().unwrap_or_default();
+        let params = json!({ "query": "hi", "count": "2" })
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
         let errors = tool.validate_params(&params);
         assert!(errors.iter().any(|e| e.contains("count should be integer")));
     }
@@ -233,7 +260,11 @@ mod tests {
             .cloned()
             .unwrap_or_default();
         let errors = tool.validate_params(&params);
-        assert!(errors.iter().any(|e| e.contains("query must be at least 2 chars")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("query must be at least 2 chars"))
+        );
         assert!(errors.iter().any(|e| e.contains("mode must be one of")));
     }
 
@@ -251,8 +282,16 @@ mod tests {
         .cloned()
         .unwrap_or_default();
         let errors = tool.validate_params(&params);
-        assert!(errors.iter().any(|e| e.contains("missing required meta.tag")));
-        assert!(errors.iter().any(|e| e.contains("meta.flags[0] should be string")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("missing required meta.tag"))
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("meta.flags[0] should be string"))
+        );
     }
 
     #[test]
@@ -270,7 +309,9 @@ mod tests {
     async fn registry_returns_validation_error() {
         let mut registry = ToolRegistry::new();
         registry.register(std::sync::Arc::new(SampleTool));
-        let result = registry.execute("sample", json!({ "query": "hi" }).as_object().unwrap()).await;
+        let result = registry
+            .execute("sample", json!({ "query": "hi" }).as_object().unwrap())
+            .await;
         assert!(result.contains("Invalid parameters"));
     }
 }

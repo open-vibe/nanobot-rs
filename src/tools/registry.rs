@@ -41,7 +41,10 @@ impl ToolRegistry {
 
         let errors = tool.validate_params(params);
         if !errors.is_empty() {
-            return format!("Error: Invalid parameters for tool '{name}': {}", errors.join("; "));
+            return format!(
+                "Error: Invalid parameters for tool '{name}': {}",
+                errors.join("; ")
+            );
         }
 
         match tool.execute(params).await {

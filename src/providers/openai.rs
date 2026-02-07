@@ -13,7 +13,11 @@ pub struct OpenAIProvider {
 }
 
 impl OpenAIProvider {
-    pub fn new(api_key: impl Into<String>, api_base: Option<String>, default_model: impl Into<String>) -> Self {
+    pub fn new(
+        api_key: impl Into<String>,
+        api_base: Option<String>,
+        default_model: impl Into<String>,
+    ) -> Self {
         Self {
             api_key: api_key.into(),
             api_base: api_base.unwrap_or_else(|| "https://api.openai.com/v1".to_string()),
@@ -94,10 +98,18 @@ impl LLMProvider for OpenAIProvider {
                         let id = tc.get("id")?.as_str()?.to_string();
                         let function = tc.get("function")?;
                         let name = function.get("name")?.as_str()?.to_string();
-                        let args_raw = function.get("arguments").and_then(Value::as_str).unwrap_or("{}");
-                        let args_value: Value = serde_json::from_str(args_raw).unwrap_or_else(|_| json!({ "raw": args_raw }));
+                        let args_raw = function
+                            .get("arguments")
+                            .and_then(Value::as_str)
+                            .unwrap_or("{}");
+                        let args_value: Value = serde_json::from_str(args_raw)
+                            .unwrap_or_else(|_| json!({ "raw": args_raw }));
                         let arguments = args_value.as_object().cloned().unwrap_or_default();
-                        Some(ToolCallRequest { id, name, arguments })
+                        Some(ToolCallRequest {
+                            id,
+                            name,
+                            arguments,
+                        })
                     })
                     .collect::<Vec<_>>()
             })
