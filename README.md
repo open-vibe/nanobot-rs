@@ -1,5 +1,7 @@
 # nanobot-rs
 
+English: [README.en.md](README.en.md)
+
 `nanobot-rs` 是对原 `nanobot` 的 Rust 完整移植版本，目标是保留原有工作流和工具能力，同时提供更稳定的并发与部署体验。
 
 ## 特性
