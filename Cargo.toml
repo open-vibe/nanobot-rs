@@ -1,12 +1,12 @@
 [package]
-name = "nanobot-rs"
+name = "nanobot"
 version = "0.1.0"
 edition = "2024"
 description = "Rust port of nanobot, a lightweight personal AI assistant with tools and multi-channel gateway support."
 license = "MIT"
 repository = "https://github.com/citizenll/nanobot-rs"
 homepage = "https://github.com/citizenll/nanobot-rs"
-documentation = "https://docs.rs/nanobot-rs"
+documentation = "https://docs.rs/nanobot"
 readme = "README.en.md"
 keywords = ["ai", "assistant", "agent", "llm", "chatbot"]
 categories = ["command-line-utilities", "development-tools"]
