@@ -141,7 +141,7 @@ If you use the Slack channel (Socket Mode):
 }
 ```
 
-If you use the QQ channel:
+If you use the QQ channel (currently direct/private chat only):
 
 ```json
 {
@@ -208,13 +208,30 @@ Default builds do not include DingTalk Stream. Enable it with:
 cargo run --features dingtalk-stream -- gateway
 ```
 
-## QQ Channel
+## QQ Channel (Direct/Private Chat Only)
 
-Default builds do not include QQ. Enable it with:
+QQ support is disabled by default; enable it via the `qq-botrs` feature.
+
+1. Register and create a bot
+- Go to [QQ Open Platform](https://q.qq.com), register as a developer, and create a bot app
+- Copy `AppID` and `AppSecret` from Developer Settings
+
+2. Configure sandbox for testing
+- Open sandbox settings in the bot console
+- Add your QQ account as a test member
+- Scan the bot QR code with mobile QQ and start a direct chat
+
+3. Configure `~/.nanobot/config.json`
+- Use the `qq` snippet above with `appId` and `secret`
+- Leave `allowFrom` empty for open access, or set allowed user openids from logs
+
+4. Start gateway
 
 ```bash
 cargo run --features qq-botrs -- gateway
 ```
+
+After startup, send a direct QQ message to the bot and it should reply.
 
 ## WhatsApp Login
 

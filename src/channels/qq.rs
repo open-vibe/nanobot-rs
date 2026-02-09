@@ -163,7 +163,9 @@ impl Channel for QQChannel {
                 return Err(anyhow!("invalid QQ token: {err}"));
             }
 
-            let intents = Intents::default().with_public_messages();
+            let intents = Intents::default()
+                .with_public_messages()
+                .with_direct_message();
             let handler = QQEventHandler {
                 shared: self.shared.clone(),
             };

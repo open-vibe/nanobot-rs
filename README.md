@@ -141,7 +141,7 @@ cargo run -- onboard
 }
 ```
 
-如需使用 QQ 通道：
+如需使用 QQ 通道（当前仅支持单聊）：
 
 ```json
 {
@@ -208,13 +208,30 @@ cargo run --features feishu-websocket -- gateway
 cargo run --features dingtalk-stream -- gateway
 ```
 
-## QQ 通道
+## QQ 通道（当前仅支持单聊）
 
-默认构建不启用 QQ。要启用 QQ 通道：
+默认构建不启用 QQ；需通过 `qq-botrs` 特性开启。
+
+1. 注册并创建机器人
+- 访问 [QQ 开放平台](https://q.qq.com) 注册开发者并创建机器人应用
+- 在开发设置中获取 `AppID` 和 `AppSecret`
+
+2. 完成沙箱测试配置
+- 在机器人控制台进入沙箱配置
+- 将你的 QQ 号加入消息测试成员
+- 使用手机 QQ 扫码后，进入机器人会话测试收发
+
+3. 配置 `~/.nanobot/config.json`
+- 使用上面的 `qq` 配置片段，填入 `appId`、`secret`
+- `allowFrom` 为空表示不限制；若需限制，可填入允许的用户 openid（可从运行日志中获取）
+
+4. 运行网关
 
 ```bash
 cargo run --features qq-botrs -- gateway
 ```
+
+启动后，向机器人发送 QQ 单聊消息即可收到回复。
 
 ## WhatsApp 登录
 
