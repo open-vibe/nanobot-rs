@@ -202,6 +202,60 @@ pub struct DingTalkConfig {
     pub allow_from: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct EmailConfig {
+    pub enabled: bool,
+    pub consent_granted: bool,
+    pub imap_host: String,
+    pub imap_port: u16,
+    pub imap_username: String,
+    pub imap_password: String,
+    pub imap_mailbox: String,
+    pub imap_use_ssl: bool,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub smtp_use_tls: bool,
+    pub smtp_use_ssl: bool,
+    pub from_address: String,
+    pub auto_reply_enabled: bool,
+    pub poll_interval_seconds: u64,
+    pub mark_seen: bool,
+    pub max_body_chars: usize,
+    pub subject_prefix: String,
+    pub allow_from: Vec<String>,
+}
+
+impl Default for EmailConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            consent_granted: false,
+            imap_host: String::new(),
+            imap_port: 993,
+            imap_username: String::new(),
+            imap_password: String::new(),
+            imap_mailbox: "INBOX".to_string(),
+            imap_use_ssl: true,
+            smtp_host: String::new(),
+            smtp_port: 587,
+            smtp_username: String::new(),
+            smtp_password: String::new(),
+            smtp_use_tls: true,
+            smtp_use_ssl: false,
+            from_address: String::new(),
+            auto_reply_enabled: true,
+            poll_interval_seconds: 30,
+            mark_seen: true,
+            max_body_chars: 12_000,
+            subject_prefix: "Re: ".to_string(),
+            allow_from: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ChannelsConfig {
@@ -210,6 +264,7 @@ pub struct ChannelsConfig {
     pub discord: DiscordConfig,
     pub feishu: FeishuConfig,
     pub dingtalk: DingTalkConfig,
+    pub email: EmailConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

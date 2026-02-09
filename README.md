@@ -33,6 +33,7 @@ English: [README.en.md](README.en.md)
   - WhatsApp（Node bridge）
   - Feishu（REST 发送；WebSocket 接收可选特性）
   - DingTalk（Stream 接收可选特性）
+  - Email（IMAP 收信 + SMTP 发信，需显式 consent）
 - 内置 skills：同步原项目 `skills/*`
 
 ## 环境要求
@@ -92,6 +93,30 @@ cargo run -- onboard
 }
 ```
 
+如需使用 Email 通道（IMAP + SMTP）：
+
+```json
+{
+  "channels": {
+    "email": {
+      "enabled": true,
+      "consentGranted": true,
+      "imapHost": "imap.gmail.com",
+      "imapPort": 993,
+      "imapUsername": "you@gmail.com",
+      "imapPassword": "app-password",
+      "smtpHost": "smtp.gmail.com",
+      "smtpPort": 587,
+      "smtpUsername": "you@gmail.com",
+      "smtpPassword": "app-password",
+      "smtpUseTls": true,
+      "fromAddress": "you@gmail.com",
+      "allowFrom": ["trusted@example.com"]
+    }
+  }
+}
+```
+
 ### 3. 直接对话
 
 ```bash
@@ -125,6 +150,8 @@ cargo run -- cron enable <job_id>
 cargo run -- cron run <job_id>
 cargo run -- cron remove <job_id>
 ```
+
+交互模式退出命令：`exit`、`quit`、`/exit`、`/quit`、`:q`，或 `Ctrl+C`/`Ctrl+D`。
 
 ## Feishu WebSocket 接收
 

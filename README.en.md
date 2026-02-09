@@ -33,6 +33,7 @@
   - WhatsApp (Node bridge)
   - Feishu (REST send; optional WebSocket receive feature)
   - DingTalk (optional Stream receive feature)
+  - Email (IMAP inbound + SMTP outbound, explicit consent required)
 - Built-in skills synced from the original project (`skills/*`)
 
 ## Requirements
@@ -92,6 +93,30 @@ If you use DingTalk, add this under `channels`:
 }
 ```
 
+If you use the Email channel (IMAP + SMTP):
+
+```json
+{
+  "channels": {
+    "email": {
+      "enabled": true,
+      "consentGranted": true,
+      "imapHost": "imap.gmail.com",
+      "imapPort": 993,
+      "imapUsername": "you@gmail.com",
+      "imapPassword": "app-password",
+      "smtpHost": "smtp.gmail.com",
+      "smtpPort": 587,
+      "smtpUsername": "you@gmail.com",
+      "smtpPassword": "app-password",
+      "smtpUseTls": true,
+      "fromAddress": "you@gmail.com",
+      "allowFrom": ["trusted@example.com"]
+    }
+  }
+}
+```
+
 ### 3. Chat directly
 
 ```bash
@@ -125,6 +150,8 @@ cargo run -- cron enable <job_id>
 cargo run -- cron run <job_id>
 cargo run -- cron remove <job_id>
 ```
+
+Interactive exit commands: `exit`, `quit`, `/exit`, `/quit`, `:q`, or `Ctrl+C`/`Ctrl+D`.
 
 ## Feishu WebSocket Receive
 

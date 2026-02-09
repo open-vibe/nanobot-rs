@@ -2,6 +2,7 @@ use crate::bus::MessageBus;
 use crate::channels::base::Channel;
 use crate::channels::dingtalk::DingTalkChannel;
 use crate::channels::discord::DiscordChannel;
+use crate::channels::email::EmailChannel;
 use crate::channels::feishu::FeishuChannel;
 use crate::channels::telegram::TelegramChannel;
 use crate::channels::whatsapp::WhatsAppChannel;
@@ -71,6 +72,15 @@ impl ChannelManager {
                 "dingtalk".to_string(),
                 Arc::new(DingTalkChannel::new(
                     config.channels.dingtalk.clone(),
+                    bus.clone(),
+                )),
+            );
+        }
+        if config.channels.email.enabled {
+            channels.insert(
+                "email".to_string(),
+                Arc::new(EmailChannel::new(
+                    config.channels.email.clone(),
                     bus.clone(),
                 )),
             );

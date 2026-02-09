@@ -427,20 +427,33 @@ async fn cmd_agent(message: Option<String>, session: &str) -> Result<()> {
             .await?;
         println!("nanobot-rs: {response}");
     } else {
-        println!("nanobot-rs interactive mode (Ctrl+C to exit)");
+        println!("nanobot-rs interactive mode (type exit/quit or Ctrl+C to exit)");
         let stdin = std::io::stdin();
         for line in stdin.lock().lines() {
             let input = line?;
-            if input.trim().is_empty() {
+            let command = input.trim();
+            if command.is_empty() {
                 continue;
+            }
+            if is_exit_command(command) {
+                println!("Goodbye!");
+                return Ok(());
             }
             let response = agent_loop
                 .process_direct(&input, Some(session), None, None)
                 .await?;
             println!("nanobot-rs: {response}");
         }
+        println!("Goodbye!");
     }
     Ok(())
+}
+
+fn is_exit_command(command: &str) -> bool {
+    matches!(
+        command.to_ascii_lowercase().as_str(),
+        "exit" | "quit" | "/exit" | "/quit" | ":q"
+    )
 }
 
 async fn cmd_channels(command: ChannelCommand) -> Result<()> {
@@ -517,6 +530,32 @@ async fn cmd_channels(command: ChannelCommand) -> Result<()> {
                     "disabled"
                 },
                 dt_client
+            );
+            let email_user = if config.channels.email.imap_username.is_empty() {
+                "not configured".to_string()
+            } else {
+                let prefix: String = config
+                    .channels
+                    .email
+                    .imap_username
+                    .chars()
+                    .take(12)
+                    .collect();
+                format!("{prefix}...")
+            };
+            println!(
+                "Email: {} (consent={}, imap_user={})",
+                if config.channels.email.enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                },
+                if config.channels.email.consent_granted {
+                    "granted"
+                } else {
+                    "not granted"
+                },
+                email_user
             );
         }
         ChannelCommand::Login => {
