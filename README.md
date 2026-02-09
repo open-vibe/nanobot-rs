@@ -2,7 +2,17 @@
 
 English: [README.en.md](README.en.md)
 
-`nanobot-rs` 是对原 `nanobot` 的 Rust 完整移植版本，目标是保留原有工作流和工具能力，同时提供更稳定的并发与部署体验。
+## Ultra-Lightweight Personal AI Assistant, Rust Edition
+
+`nanobot-rs` 是 [`HKUDS/nanobot`](https://github.com/HKUDS/nanobot) 的 Rust 版本，延续 ultra-lightweight 的 Agent 设计与工具工作流。
+
+- Rust 重写：更稳定的并发执行、更清晰的部署和工程化体验
+- 已由 [`open-vibe/open-vibe`](https://github.com/open-vibe/open-vibe) 接入，作为其 `nanobot` Rust 实现
+- 作为 `open-vibe` 后续核心运行时之一持续演进
+
+## Open Vibe 集成
+
+- Open Vibe 当前集成重点：DingTalk stream bridge + relay workflow 到 Open Vibe threads
 
 ## 特性
 
