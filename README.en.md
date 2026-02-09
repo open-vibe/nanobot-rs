@@ -34,6 +34,8 @@
   - Feishu (REST send; optional WebSocket receive feature)
   - DingTalk (optional Stream receive feature)
   - Email (IMAP inbound + SMTP outbound, explicit consent required)
+  - Slack (Socket Mode)
+  - QQ (optional feature `qq-botrs`)
 - Built-in skills synced from the original project (`skills/*`)
 
 ## Requirements
@@ -117,6 +119,43 @@ If you use the Email channel (IMAP + SMTP):
 }
 ```
 
+If you use the Slack channel (Socket Mode):
+
+```json
+{
+  "channels": {
+    "slack": {
+      "enabled": true,
+      "mode": "socket",
+      "botToken": "xoxb-...",
+      "appToken": "xapp-...",
+      "groupPolicy": "mention",
+      "groupAllowFrom": [],
+      "dm": {
+        "enabled": true,
+        "policy": "open",
+        "allowFrom": []
+      }
+    }
+  }
+}
+```
+
+If you use the QQ channel:
+
+```json
+{
+  "channels": {
+    "qq": {
+      "enabled": true,
+      "appId": "your-app-id",
+      "secret": "your-secret",
+      "allowFrom": []
+    }
+  }
+}
+```
+
 ### 3. Chat directly
 
 ```bash
@@ -169,6 +208,14 @@ Default builds do not include DingTalk Stream. Enable it with:
 cargo run --features dingtalk-stream -- gateway
 ```
 
+## QQ Channel
+
+Default builds do not include QQ. Enable it with:
+
+```bash
+cargo run --features qq-botrs -- gateway
+```
+
 ## WhatsApp Login
 
 `channels login` will automatically:
@@ -185,6 +232,7 @@ cargo fmt
 cargo test
 cargo check --features feishu-websocket
 cargo check --features dingtalk-stream
+cargo check --features qq-botrs
 ```
 
 ## License

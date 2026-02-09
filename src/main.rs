@@ -557,6 +557,37 @@ async fn cmd_channels(command: ChannelCommand) -> Result<()> {
                 },
                 email_user
             );
+            let slack_mode = if config.channels.slack.bot_token.is_empty()
+                || config.channels.slack.app_token.is_empty()
+            {
+                "not configured".to_string()
+            } else {
+                config.channels.slack.mode.clone()
+            };
+            println!(
+                "Slack: {} ({})",
+                if config.channels.slack.enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                },
+                slack_mode
+            );
+            let qq_app = if config.channels.qq.app_id.is_empty() {
+                "not configured".to_string()
+            } else {
+                let prefix: String = config.channels.qq.app_id.chars().take(8).collect();
+                format!("{prefix}...")
+            };
+            println!(
+                "QQ: {} (app_id={})",
+                if config.channels.qq.enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                },
+                qq_app
+            );
         }
         ChannelCommand::Login => {
             cmd_channels_login().await?;

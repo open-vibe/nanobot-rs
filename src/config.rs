@@ -256,6 +256,63 @@ impl Default for EmailConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SlackDMConfig {
+    pub enabled: bool,
+    pub policy: String,
+    pub allow_from: Vec<String>,
+}
+
+impl Default for SlackDMConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            policy: "open".to_string(),
+            allow_from: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SlackConfig {
+    pub enabled: bool,
+    pub mode: String,
+    pub webhook_path: String,
+    pub bot_token: String,
+    pub app_token: String,
+    pub user_token_read_only: bool,
+    pub group_policy: String,
+    pub group_allow_from: Vec<String>,
+    pub dm: SlackDMConfig,
+}
+
+impl Default for SlackConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mode: "socket".to_string(),
+            webhook_path: "/slack/events".to_string(),
+            bot_token: String::new(),
+            app_token: String::new(),
+            user_token_read_only: true,
+            group_policy: "open".to_string(),
+            group_allow_from: Vec::new(),
+            dm: SlackDMConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct QQConfig {
+    pub enabled: bool,
+    pub app_id: String,
+    pub secret: String,
+    pub allow_from: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ChannelsConfig {
@@ -265,6 +322,8 @@ pub struct ChannelsConfig {
     pub feishu: FeishuConfig,
     pub dingtalk: DingTalkConfig,
     pub email: EmailConfig,
+    pub slack: SlackConfig,
+    pub qq: QQConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

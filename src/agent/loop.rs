@@ -125,11 +125,15 @@ impl AgentLoop {
 
             let response = match self.process_message(msg.clone()).await {
                 Ok(resp) => resp,
-                Err(err) => OutboundMessage::new(
-                    msg.channel.clone(),
-                    msg.chat_id.clone(),
-                    format!("Sorry, I encountered an error: {err}"),
-                ),
+                Err(err) => {
+                    let mut out = OutboundMessage::new(
+                        msg.channel.clone(),
+                        msg.chat_id.clone(),
+                        format!("Sorry, I encountered an error: {err}"),
+                    );
+                    out.metadata = msg.metadata.clone();
+                    out
+                }
             };
             let _ = self.bus.publish_outbound(response).await;
         }
@@ -219,7 +223,9 @@ impl AgentLoop {
         session.add_message("assistant", &answer);
         self.sessions.save(&session)?;
 
-        Ok(OutboundMessage::new(msg.channel, msg.chat_id, answer))
+        let mut outbound = OutboundMessage::new(msg.channel, msg.chat_id, answer);
+        outbound.metadata = msg.metadata;
+        Ok(outbound)
     }
 
     async fn process_system_message(&self, msg: InboundMessage) -> Result<OutboundMessage> {

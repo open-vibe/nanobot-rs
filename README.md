@@ -34,6 +34,8 @@ English: [README.en.md](README.en.md)
   - Feishu（REST 发送；WebSocket 接收可选特性）
   - DingTalk（Stream 接收可选特性）
   - Email（IMAP 收信 + SMTP 发信，需显式 consent）
+  - Slack（Socket Mode）
+  - QQ（可选特性，`qq-botrs`）
 - 内置 skills：同步原项目 `skills/*`
 
 ## 环境要求
@@ -117,6 +119,43 @@ cargo run -- onboard
 }
 ```
 
+如需使用 Slack 通道（Socket Mode）：
+
+```json
+{
+  "channels": {
+    "slack": {
+      "enabled": true,
+      "mode": "socket",
+      "botToken": "xoxb-...",
+      "appToken": "xapp-...",
+      "groupPolicy": "mention",
+      "groupAllowFrom": [],
+      "dm": {
+        "enabled": true,
+        "policy": "open",
+        "allowFrom": []
+      }
+    }
+  }
+}
+```
+
+如需使用 QQ 通道：
+
+```json
+{
+  "channels": {
+    "qq": {
+      "enabled": true,
+      "appId": "your-app-id",
+      "secret": "your-secret",
+      "allowFrom": []
+    }
+  }
+}
+```
+
 ### 3. 直接对话
 
 ```bash
@@ -169,6 +208,14 @@ cargo run --features feishu-websocket -- gateway
 cargo run --features dingtalk-stream -- gateway
 ```
 
+## QQ 通道
+
+默认构建不启用 QQ。要启用 QQ 通道：
+
+```bash
+cargo run --features qq-botrs -- gateway
+```
+
 ## WhatsApp 登录
 
 `channels login` 会自动：
@@ -185,6 +232,7 @@ cargo fmt
 cargo test
 cargo check --features feishu-websocket
 cargo check --features dingtalk-stream
+cargo check --features qq-botrs
 ```
 
 ## License

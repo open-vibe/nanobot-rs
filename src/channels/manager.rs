@@ -4,6 +4,8 @@ use crate::channels::dingtalk::DingTalkChannel;
 use crate::channels::discord::DiscordChannel;
 use crate::channels::email::EmailChannel;
 use crate::channels::feishu::FeishuChannel;
+use crate::channels::qq::QQChannel;
+use crate::channels::slack::SlackChannel;
 use crate::channels::telegram::TelegramChannel;
 use crate::channels::whatsapp::WhatsAppChannel;
 use crate::config::Config;
@@ -83,6 +85,21 @@ impl ChannelManager {
                     config.channels.email.clone(),
                     bus.clone(),
                 )),
+            );
+        }
+        if config.channels.slack.enabled {
+            channels.insert(
+                "slack".to_string(),
+                Arc::new(SlackChannel::new(
+                    config.channels.slack.clone(),
+                    bus.clone(),
+                )),
+            );
+        }
+        if config.channels.qq.enabled {
+            channels.insert(
+                "qq".to_string(),
+                Arc::new(QQChannel::new(config.channels.qq.clone(), bus.clone())),
             );
         }
 
