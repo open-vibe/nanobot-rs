@@ -404,11 +404,20 @@ async fn cmd_agent(message: Option<String>, session: &str) -> Result<()> {
             .get_provider(Some(&model))
             .and_then(|p| p.extra_headers.clone()),
     ));
-    let agent_loop = AgentLoop::new(
-        bus,
+    let session_manager = Arc::new(SessionManager::new()?);
+    let cron_store_path = get_data_path()?.join("cron").join("jobs.json");
+    let cron = Arc::new(CronService::new(cron_store_path));
+    let channels = Arc::new(ChannelManager::new(
+        &config,
+        bus.clone(),
+        Some(session_manager.clone()),
+    ));
+
+    let agent_loop = Arc::new(AgentLoop::new(
+        bus.clone(),
         provider,
         config.workspace_path(),
-        Some(model),
+        Some(model.clone()),
         config.agents.defaults.max_tool_iterations,
         if config.tools.web.search.api_key.is_empty() {
             None
@@ -417,9 +426,45 @@ async fn cmd_agent(message: Option<String>, session: &str) -> Result<()> {
         },
         config.tools.exec.timeout,
         config.tools.restrict_to_workspace,
-        None,
-        None,
-    )?;
+        Some(cron.clone()),
+        Some(session_manager.clone()),
+    )?);
+
+    let bus_for_cron = bus.clone();
+    let agent_for_cron = agent_loop.clone();
+    let channels_for_cron = channels.clone();
+    cron.set_on_job(Arc::new(move |job| {
+        let bus = bus_for_cron.clone();
+        let agent = agent_for_cron.clone();
+        let channels = channels_for_cron.clone();
+        Box::pin(async move {
+            let response = agent
+                .process_direct(
+                    &job.payload.message,
+                    Some(&format!("cron:{}", job.id)),
+                    job.payload.channel.as_deref(),
+                    job.payload.to.as_deref(),
+                )
+                .await?;
+
+            if job.payload.deliver
+                && let (Some(channel), Some(to)) =
+                    (job.payload.channel.clone(), job.payload.to.clone())
+            {
+                let outbound = OutboundMessage::new(channel.clone(), to, response.clone());
+                if channel == "cli" {
+                    println!("nanobot-rs[cron]: {response}");
+                } else if let Some(adapter) = channels.get_channel(&channel) {
+                    adapter.send(&outbound).await?;
+                } else {
+                    bus.publish_outbound(outbound).await?;
+                }
+            }
+            Ok(Some(response))
+        })
+    }))
+    .await;
+    cron.start().await?;
 
     if let Some(content) = message {
         let response = agent_loop
@@ -436,8 +481,7 @@ async fn cmd_agent(message: Option<String>, session: &str) -> Result<()> {
                 continue;
             }
             if is_exit_command(command) {
-                println!("Goodbye!");
-                return Ok(());
+                break;
             }
             let response = agent_loop
                 .process_direct(&input, Some(session), None, None)
@@ -446,6 +490,7 @@ async fn cmd_agent(message: Option<String>, session: &str) -> Result<()> {
         }
         println!("Goodbye!");
     }
+    cron.stop().await;
     Ok(())
 }
 
@@ -799,6 +844,83 @@ async fn cmd_cron(command: CronCommand) -> Result<()> {
             }
         }
         CronCommand::Run { job_id, force } => {
+            let config = load_config(None).unwrap_or_default();
+            let model = config.agents.defaults.model.clone();
+            let is_bedrock = model.starts_with("bedrock/");
+            let api_key = config.get_api_key(Some(&model));
+            if api_key.is_none() && !is_bedrock {
+                return Err(anyhow!(
+                    "No API key configured. Set one in ~/.nanobot/config.json under providers.*.apiKey"
+                ));
+            }
+
+            let bus = Arc::new(MessageBus::new(1024));
+            let provider = Arc::new(OpenAIProvider::new(
+                api_key.unwrap_or_else(|| "dummy".to_string()),
+                config.get_api_base(Some(&model)),
+                model.clone(),
+                config
+                    .get_provider(Some(&model))
+                    .and_then(|p| p.extra_headers.clone()),
+            ));
+            let session_manager = Arc::new(SessionManager::new()?);
+            let channels = Arc::new(ChannelManager::new(
+                &config,
+                bus.clone(),
+                Some(session_manager.clone()),
+            ));
+            let agent = Arc::new(AgentLoop::new(
+                bus.clone(),
+                provider,
+                config.workspace_path(),
+                Some(model),
+                config.agents.defaults.max_tool_iterations,
+                if config.tools.web.search.api_key.is_empty() {
+                    None
+                } else {
+                    Some(config.tools.web.search.api_key.clone())
+                },
+                config.tools.exec.timeout,
+                config.tools.restrict_to_workspace,
+                Some(cron.clone()),
+                Some(session_manager),
+            )?);
+
+            let bus_for_cron = bus.clone();
+            let agent_for_cron = agent.clone();
+            let channels_for_cron = channels.clone();
+            cron.set_on_job(Arc::new(move |job| {
+                let bus = bus_for_cron.clone();
+                let agent = agent_for_cron.clone();
+                let channels = channels_for_cron.clone();
+                Box::pin(async move {
+                    let response = agent
+                        .process_direct(
+                            &job.payload.message,
+                            Some(&format!("cron:{}", job.id)),
+                            job.payload.channel.as_deref(),
+                            job.payload.to.as_deref(),
+                        )
+                        .await?;
+
+                    if job.payload.deliver
+                        && let (Some(channel), Some(to)) =
+                            (job.payload.channel.clone(), job.payload.to.clone())
+                    {
+                        let outbound = OutboundMessage::new(channel.clone(), to, response.clone());
+                        if channel == "cli" {
+                            println!("nanobot-rs[cron]: {response}");
+                        } else if let Some(adapter) = channels.get_channel(&channel) {
+                            adapter.send(&outbound).await?;
+                        } else {
+                            bus.publish_outbound(outbound).await?;
+                        }
+                    }
+                    Ok(Some(response))
+                })
+            }))
+            .await;
+
             if cron.run_job(&job_id, force).await? {
                 println!("Job executed");
             } else {
