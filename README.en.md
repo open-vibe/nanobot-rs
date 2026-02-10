@@ -9,6 +9,7 @@
 - Rust rewrite for stronger concurrency stability and cleaner deployment ergonomics
 - Already integrated by [`open-vibe/open-vibe`](https://github.com/open-vibe/open-vibe) as its Rust implementation of `nanobot`
 - Evolving as one of the core runtimes for `open-vibe`
+- Inspired by [`OpenClaw`](https://github.com/openclaw/openclaw)
 
 ## Open Vibe Integration
 
@@ -54,6 +55,8 @@
 ```bash
 cargo run -- onboard
 ```
+
+This initializes workspace basics including `memory/MEMORY.md` and `skills/` for custom local skills.
 
 ### 2. Configure API key
 

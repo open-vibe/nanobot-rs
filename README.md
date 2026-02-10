@@ -9,6 +9,7 @@ English: [README.en.md](README.en.md)
 - Rust 重写：更稳定的并发执行、更清晰的部署和工程化体验
 - 已由 [`open-vibe/open-vibe`](https://github.com/open-vibe/open-vibe) 接入，作为其 `nanobot` Rust 实现
 - 作为 `open-vibe` 后续核心运行时之一持续演进
+- 灵感来源于 [`OpenClaw`](https://github.com/openclaw/openclaw)
 
 ## Open Vibe 集成
 
@@ -54,6 +55,8 @@ English: [README.en.md](README.en.md)
 ```bash
 cargo run -- onboard
 ```
+
+该步骤会初始化工作区基础结构，包括 `memory/MEMORY.md` 与用于本地自定义技能的 `skills/` 目录。
 
 ### 2. 配置 API Key
 
