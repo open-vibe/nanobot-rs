@@ -84,6 +84,35 @@ Edit `~/.nanobot/config.json`:
 }
 ```
 
+For MiniMax, add a `providers.minimax` section and use a model containing `minimax` (for example `minimax/MiniMax-M2.1`):
+
+```json
+{
+  "providers": {
+    "minimax": {
+      "apiKey": "minimax-xxx"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "minimax/MiniMax-M2.1"
+    }
+  }
+}
+```
+
+If your key is from MiniMax Mainland China (minimaxi.com), set:
+
+```json
+{
+  "providers": {
+    "minimax": {
+      "apiBase": "https://api.minimaxi.com/v1"
+    }
+  }
+}
+```
+
 If you use DingTalk, add this under `channels`:
 
 ```json

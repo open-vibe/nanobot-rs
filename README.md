@@ -84,6 +84,35 @@ cargo run -- onboard
 }
 ```
 
+如需使用 MiniMax，可在 `providers.minimax` 中配置密钥，并将模型设置为包含 `minimax` 的名称（例如 `minimax/MiniMax-M2.1`）：
+
+```json
+{
+  "providers": {
+    "minimax": {
+      "apiKey": "minimax-xxx"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "minimax/MiniMax-M2.1"
+    }
+  }
+}
+```
+
+如果你的密钥来自 MiniMax 中国大陆平台（minimaxi.com），请设置：
+
+```json
+{
+  "providers": {
+    "minimax": {
+      "apiBase": "https://api.minimaxi.com/v1"
+    }
+  }
+}
+```
+
 如需使用钉钉，还可在 `channels` 中增加：
 
 ```json
