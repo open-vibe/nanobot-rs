@@ -1,6 +1,6 @@
 [package]
 name = "nanobot"
-version = "0.2.8"
+version = "0.2.9"
 edition = "2024"
 description = "Rust port of nanobot, a lightweight personal AI assistant with tools and multi-channel gateway support."
 license = "MIT"
