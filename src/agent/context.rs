@@ -1,5 +1,6 @@
 use crate::memory::MemoryStore;
 use crate::skills::SkillsLoader;
+use base64::Engine;
 use chrono::Local;
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -82,6 +83,7 @@ impl ContextBuilder {
         skill_names: Option<&[String]>,
         channel: Option<&str>,
         chat_id: Option<&str>,
+        media: Option<&[String]>,
     ) -> Vec<Value> {
         let mut system_prompt = self.build_system_prompt(skill_names);
         if let (Some(channel), Some(chat_id)) = (channel, chat_id) {
@@ -96,9 +98,10 @@ impl ContextBuilder {
             "content": system_prompt,
         }));
         messages.extend(history.iter().cloned());
+        let user_content = build_user_content(current_message, media);
         messages.push(json!({
             "role": "user",
-            "content": current_message,
+            "content": user_content,
         }));
         messages
     }
@@ -138,5 +141,70 @@ impl ContextBuilder {
             }
         }
         messages.push(msg);
+    }
+}
+
+fn build_user_content(text: &str, media: Option<&[String]>) -> Value {
+    let Some(media_paths) = media else {
+        return Value::String(text.to_string());
+    };
+    if media_paths.is_empty() {
+        return Value::String(text.to_string());
+    }
+
+    let mut images = Vec::new();
+    for path in media_paths {
+        let p = PathBuf::from(path);
+        let Some(mime) = mime_guess::from_path(&p)
+            .first_raw()
+            .filter(|m| m.starts_with("image/"))
+        else {
+            continue;
+        };
+        let Ok(bytes) = std::fs::read(&p) else {
+            continue;
+        };
+        let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+        images.push(json!({
+            "type": "image_url",
+            "image_url": { "url": format!("data:{mime};base64,{encoded}") }
+        }));
+    }
+
+    if images.is_empty() {
+        return Value::String(text.to_string());
+    }
+    images.push(json!({
+        "type": "text",
+        "text": text
+    }));
+    Value::Array(images)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_user_content;
+    use serde_json::Value;
+    use uuid::Uuid;
+
+    #[test]
+    fn build_user_content_returns_plain_text_without_media() {
+        let value = build_user_content("hello", None);
+        assert_eq!(value, Value::String("hello".to_string()));
+    }
+
+    #[test]
+    fn build_user_content_includes_image_and_text_parts() {
+        let temp = std::env::temp_dir().join(format!("nanobot-rs-img-{}.png", Uuid::new_v4()));
+        std::fs::write(&temp, b"\x89PNG\r\n\x1a\n").expect("write temp image");
+
+        let paths = vec![temp.to_string_lossy().to_string()];
+        let value = build_user_content("hi", Some(&paths));
+        let parts = value.as_array().expect("expected array content");
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0]["type"], "image_url");
+        assert_eq!(parts[1]["type"], "text");
+
+        let _ = std::fs::remove_file(temp);
     }
 }

@@ -2665,6 +2665,7 @@ version = "0.2.8"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.1",
  "botrs",
  "chrono",
  "clap",
@@ -2677,6 +2678,7 @@ dependencies = [
  "lettre",
  "litellm-rs",
  "mailparse",
+ "mime_guess",
  "open-lark",
  "regex",
  "reqwest 0.12.28",
