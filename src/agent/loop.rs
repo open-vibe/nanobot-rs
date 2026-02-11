@@ -2,6 +2,7 @@ use crate::agent::context::ContextBuilder;
 use crate::agent::subagent::SubagentManager;
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::cron::CronService;
+use crate::memory::MemoryStore;
 use crate::providers::base::LLMProvider;
 use crate::session::SessionManager;
 use crate::tools::cron::CronTool;
@@ -150,6 +151,9 @@ impl AgentLoop {
         }
 
         let mut session = self.sessions.get_or_create(&msg.session_key());
+        if let Err(err) = self.persist_explicit_memory_request(&msg.content) {
+            eprintln!("Warning: failed to persist explicit memory request: {err}");
+        }
         self.message_tool
             .set_context(msg.channel.clone(), msg.chat_id.clone());
         self.spawn_tool
@@ -226,6 +230,15 @@ impl AgentLoop {
         let mut outbound = OutboundMessage::new(msg.channel, msg.chat_id, answer);
         outbound.metadata = msg.metadata;
         Ok(outbound)
+    }
+
+    fn persist_explicit_memory_request(&self, content: &str) -> Result<()> {
+        let Some(fact) = MemoryStore::extract_explicit_memory(content) else {
+            return Ok(());
+        };
+        let memory = MemoryStore::new(self.workspace.clone())?;
+        let _ = memory.remember_fact(&fact)?;
+        Ok(())
     }
 
     async fn process_system_message(&self, msg: InboundMessage) -> Result<OutboundMessage> {
