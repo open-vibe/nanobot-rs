@@ -26,6 +26,7 @@ English: [README.en.md](README.en.md)
   - `exec`
   - `web_search` / `web_fetch` / `http_request`
   - `message` / `spawn` / `cron`
+  - `spawn` 子代理具备当前时间上下文、`edit_file` 能力与 `skills/` 路径提示
 - 定时任务与心跳：
   - `CronService`（add/list/remove/enable/run + 持久化）
   - `HeartbeatService`

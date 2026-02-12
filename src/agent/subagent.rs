@@ -1,11 +1,12 @@
 use crate::bus::{InboundMessage, MessageBus};
 use crate::config::WebSearchConfig;
 use crate::providers::base::LLMProvider;
-use crate::tools::filesystem::{ListDirTool, ReadFileTool, WriteFileTool};
+use crate::tools::filesystem::{EditFileTool, ListDirTool, ReadFileTool, WriteFileTool};
 use crate::tools::http::HttpRequestTool;
 use crate::tools::registry::ToolRegistry;
 use crate::tools::shell::ExecTool;
 use crate::tools::web::{WebFetchTool, WebSearchTool};
+use chrono::Local;
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -149,6 +150,7 @@ async fn run_subagent(
     };
     tools.register(Arc::new(ReadFileTool::new(allowed_dir.clone())));
     tools.register(Arc::new(WriteFileTool::new(allowed_dir.clone())));
+    tools.register(Arc::new(EditFileTool::new(allowed_dir.clone())));
     tools.register(Arc::new(ListDirTool::new(allowed_dir.clone())));
     tools.register(Arc::new(ExecTool::new(
         exec_timeout_s,
@@ -161,8 +163,14 @@ async fn run_subagent(
     tools.register(Arc::new(WebFetchTool::new(50_000)));
     tools.register(Arc::new(HttpRequestTool::new(30, 50_000)));
 
+    let now = Local::now();
+    let now_text = now.format("%Y-%m-%d %H:%M (%A)").to_string();
+    let tz = now.format("%Z").to_string();
+    let tz = if tz.is_empty() { "UTC" } else { &tz };
+
     let system_prompt = format!(
-        "# Subagent\n\nYou are a subagent spawned by the main agent to complete a specific task.\n\n## Your Task\n{task}\n\n## Rules\n1. Stay focused - complete only the assigned task, nothing else\n2. Your final response will be reported back to the main agent\n3. Do not initiate conversations or take on side tasks\n4. Be concise but informative in your findings\n\n## What You Can Do\n- Read and write files in the workspace\n- Execute shell commands\n- Search the web and fetch web pages\n\n## What You Cannot Do\n- Send messages directly to users\n- Spawn other subagents\n\n## Workspace\n{}\n",
+        "# Subagent\n\n## Current Time\n{now_text} ({tz})\n\nYou are a subagent spawned by the main agent to complete a specific task.\n\n## Rules\n1. Stay focused - complete only the assigned task, nothing else\n2. Your final response will be reported back to the main agent\n3. Do not initiate conversations or take on side tasks\n4. Be concise but informative in your findings\n\n## What You Can Do\n- Read, write, and edit files in the workspace\n- Execute shell commands\n- Search the web and fetch web pages\n\n## What You Cannot Do\n- Send messages directly to users\n- Spawn other subagents\n\n## Workspace\n{}\nSkills are available at: {}/skills/ (read SKILL.md files as needed)\n",
+        workspace.display(),
         workspace.display()
     );
 

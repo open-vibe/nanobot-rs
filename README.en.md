@@ -26,6 +26,7 @@
   - `exec`
   - `web_search` / `web_fetch` / `http_request`
   - `message` / `spawn` / `cron`
+  - `spawn` subagents include current-time context, `edit_file` capability, and `skills/` path guidance
 - Scheduling and heartbeat:
   - `CronService` (add/list/remove/enable/run + persistence)
   - `HeartbeatService`
