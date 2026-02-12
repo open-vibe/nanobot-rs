@@ -217,6 +217,10 @@ impl AgentLoop {
                         &result,
                     );
                 }
+                messages.push(json!({
+                    "role": "user",
+                    "content": "Reflect on the results and decide next steps."
+                }));
             } else {
                 final_content = response.content;
                 break;
@@ -304,6 +308,10 @@ impl AgentLoop {
                         &result,
                     );
                 }
+                messages.push(json!({
+                    "role": "user",
+                    "content": "Reflect on the results and decide next steps."
+                }));
             } else {
                 final_content = response.content;
                 break;
