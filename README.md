@@ -24,7 +24,7 @@ English: [README.en.md](README.en.md)
 - 工具系统：
   - `read_file` / `write_file` / `edit_file` / `list_dir`
   - `exec`
-  - `web_search` / `web_fetch`
+  - `web_search` / `web_fetch` / `http_request`
   - `message` / `spawn` / `cron`
 - 定时任务与心跳：
   - `CronService`（add/list/remove/enable/run + 持久化）
@@ -46,7 +46,7 @@ English: [README.en.md](README.en.md)
 - Rust stable（建议 1.85+）
 - 可选：
   - Node.js 18+（WhatsApp bridge 登录）
-  - Brave Search API Key（`web_search`）
+  - Brave Search API Key（`web_search`，可选；未配置时自动降级到 DuckDuckGo 无 key 搜索）
   - Groq API Key（语音转写）
 
 ## 快速开始
@@ -121,6 +121,49 @@ cargo run -- onboard
   "agents": {
     "defaults": {
       "model": "anthropic/claude-3-7-sonnet"
+    }
+  }
+}
+```
+
+`web_search` 默认优先使用 Brave（若配置了 key）；未配置 `BRAVE_API_KEY` 时会自动使用 DuckDuckGo 无 key 兜底。  
+`web_fetch` 一直可用，可直接抓取指定 URL 的正文内容。
+`http_request` 可直接发起 API 请求（支持 `GET/POST/PUT/PATCH/DELETE`、headers、query、json/body），适合访问本机端口或内网服务。
+
+如需切换 `web_search` provider（Perplexity / Grok），可在 `tools.web.search` 配置：
+
+```json
+{
+  "tools": {
+    "web": {
+      "search": {
+        "provider": "perplexity",
+        "maxResults": 5,
+        "perplexity": {
+          "apiKey": "pplx-xxx",
+          "baseUrl": "https://api.perplexity.ai",
+          "model": "perplexity/sonar-pro"
+        }
+      }
+    }
+  }
+}
+```
+
+Grok 配置示例：
+
+```json
+{
+  "tools": {
+    "web": {
+      "search": {
+        "provider": "grok",
+        "grok": {
+          "apiKey": "xai-xxx",
+          "model": "grok-4-1-fast",
+          "inlineCitations": true
+        }
+      }
     }
   }
 }

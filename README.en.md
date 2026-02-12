@@ -24,7 +24,7 @@
 - Tooling:
   - `read_file` / `write_file` / `edit_file` / `list_dir`
   - `exec`
-  - `web_search` / `web_fetch`
+  - `web_search` / `web_fetch` / `http_request`
   - `message` / `spawn` / `cron`
 - Scheduling and heartbeat:
   - `CronService` (add/list/remove/enable/run + persistence)
@@ -46,7 +46,7 @@
 - Rust stable (recommended 1.85+)
 - Optional:
   - Node.js 18+ (for WhatsApp bridge login)
-  - Brave Search API key (`web_search`)
+  - Brave Search API key (`web_search`, optional; falls back to keyless DuckDuckGo search when missing)
   - Groq API key (audio transcription)
 
 ## Quick Start
@@ -121,6 +121,49 @@ If your key is from MiniMax Mainland China (minimaxi.com), set:
   "agents": {
     "defaults": {
       "model": "anthropic/claude-3-7-sonnet"
+    }
+  }
+}
+```
+
+`web_search` prefers Brave when a key is configured, and automatically falls back to keyless DuckDuckGo when no `BRAVE_API_KEY` is available.  
+`web_fetch` remains keyless and can fetch/extract content from a concrete URL directly.
+`http_request` can call APIs directly (`GET/POST/PUT/PATCH/DELETE`, headers, query, json/body), including localhost ports and LAN services.
+
+To switch `web_search` provider (Perplexity / Grok), configure `tools.web.search`:
+
+```json
+{
+  "tools": {
+    "web": {
+      "search": {
+        "provider": "perplexity",
+        "maxResults": 5,
+        "perplexity": {
+          "apiKey": "pplx-xxx",
+          "baseUrl": "https://api.perplexity.ai",
+          "model": "perplexity/sonar-pro"
+        }
+      }
+    }
+  }
+}
+```
+
+Grok example:
+
+```json
+{
+  "tools": {
+    "web": {
+      "search": {
+        "provider": "grok",
+        "grok": {
+          "apiKey": "xai-xxx",
+          "model": "grok-4-1-fast",
+          "inlineCitations": true
+        }
+      }
     }
   }
 }

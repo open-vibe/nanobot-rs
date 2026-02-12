@@ -1,6 +1,7 @@
 pub mod base;
 pub mod cron;
 pub mod filesystem;
+pub mod http;
 pub mod message;
 pub mod registry;
 pub mod shell;

@@ -367,11 +367,7 @@ async fn cmd_gateway(port: u16, _verbose: bool) -> Result<()> {
         config.workspace_path(),
         Some(model.clone()),
         config.agents.defaults.max_tool_iterations,
-        if config.tools.web.search.api_key.is_empty() {
-            None
-        } else {
-            Some(config.tools.web.search.api_key.clone())
-        },
+        config.tools.web.search.clone(),
         config.tools.exec.timeout,
         config.tools.restrict_to_workspace,
         Some(cron.clone()),
@@ -496,11 +492,7 @@ async fn cmd_agent(message: Option<String>, session: &str) -> Result<()> {
         config.workspace_path(),
         Some(model.clone()),
         config.agents.defaults.max_tool_iterations,
-        if config.tools.web.search.api_key.is_empty() {
-            None
-        } else {
-            Some(config.tools.web.search.api_key.clone())
-        },
+        config.tools.web.search.clone(),
         config.tools.exec.timeout,
         config.tools.restrict_to_workspace,
         Some(cron.clone()),
@@ -1120,11 +1112,7 @@ async fn cmd_cron(command: CronCommand) -> Result<()> {
                 config.workspace_path(),
                 Some(model),
                 config.agents.defaults.max_tool_iterations,
-                if config.tools.web.search.api_key.is_empty() {
-                    None
-                } else {
-                    Some(config.tools.web.search.api_key.clone())
-                },
+                config.tools.web.search.clone(),
                 config.tools.exec.timeout,
                 config.tools.restrict_to_workspace,
                 Some(cron.clone()),

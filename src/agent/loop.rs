@@ -1,11 +1,13 @@
 use crate::agent::context::ContextBuilder;
 use crate::agent::subagent::SubagentManager;
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
+use crate::config::WebSearchConfig;
 use crate::cron::CronService;
 use crate::providers::base::LLMProvider;
 use crate::session::SessionManager;
 use crate::tools::cron::CronTool;
 use crate::tools::filesystem::{EditFileTool, ListDirTool, ReadFileTool, WriteFileTool};
+use crate::tools::http::HttpRequestTool;
 use crate::tools::message::MessageTool;
 use crate::tools::registry::ToolRegistry;
 use crate::tools::shell::ExecTool;
@@ -41,7 +43,7 @@ impl AgentLoop {
         workspace: PathBuf,
         model: Option<String>,
         max_iterations: u32,
-        brave_api_key: Option<String>,
+        web_search: WebSearchConfig,
         exec_timeout_s: u64,
         restrict_to_workspace: bool,
         cron_service: Option<Arc<CronService>>,
@@ -69,8 +71,9 @@ impl AgentLoop {
             None,
             restrict_to_workspace,
         )));
-        tools.register(Arc::new(WebSearchTool::new(brave_api_key, 5)));
+        tools.register(Arc::new(WebSearchTool::from_config(web_search.clone())));
         tools.register(Arc::new(WebFetchTool::new(50_000)));
+        tools.register(Arc::new(HttpRequestTool::new(30, 50_000)));
 
         let message_tool = Arc::new(MessageTool::new(bus.outbound_sender()));
         tools.register(message_tool.clone());
@@ -80,7 +83,7 @@ impl AgentLoop {
             workspace.clone(),
             bus.clone(),
             model_name.clone(),
-            None,
+            web_search,
             exec_timeout_s,
             restrict_to_workspace,
         ));

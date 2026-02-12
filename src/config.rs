@@ -79,16 +79,58 @@ pub struct AgentsConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
+pub struct PerplexitySearchConfig {
+    pub api_key: String,
+    pub base_url: Option<String>,
+    pub model: Option<String>,
+}
+
+impl Default for PerplexitySearchConfig {
+    fn default() -> Self {
+        Self {
+            api_key: String::new(),
+            base_url: None,
+            model: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct GrokSearchConfig {
+    pub api_key: String,
+    pub model: Option<String>,
+    pub inline_citations: bool,
+}
+
+impl Default for GrokSearchConfig {
+    fn default() -> Self {
+        Self {
+            api_key: String::new(),
+            model: None,
+            inline_citations: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
 pub struct WebSearchConfig {
+    pub provider: String,
     pub api_key: String,
     pub max_results: usize,
+    pub perplexity: PerplexitySearchConfig,
+    pub grok: GrokSearchConfig,
 }
 
 impl Default for WebSearchConfig {
     fn default() -> Self {
         Self {
+            provider: "brave".to_string(),
             api_key: String::new(),
             max_results: 5,
+            perplexity: PerplexitySearchConfig::default(),
+            grok: GrokSearchConfig::default(),
         }
     }
 }

@@ -1,6 +1,8 @@
 use crate::bus::{InboundMessage, MessageBus};
+use crate::config::WebSearchConfig;
 use crate::providers::base::LLMProvider;
 use crate::tools::filesystem::{ListDirTool, ReadFileTool, WriteFileTool};
+use crate::tools::http::HttpRequestTool;
 use crate::tools::registry::ToolRegistry;
 use crate::tools::shell::ExecTool;
 use crate::tools::web::{WebFetchTool, WebSearchTool};
@@ -16,7 +18,7 @@ pub struct SubagentManager {
     workspace: PathBuf,
     bus: Arc<MessageBus>,
     model: String,
-    brave_api_key: Option<String>,
+    web_search: WebSearchConfig,
     exec_timeout_s: u64,
     restrict_to_workspace: bool,
     running_tasks: Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>,
@@ -28,7 +30,7 @@ impl SubagentManager {
         workspace: PathBuf,
         bus: Arc<MessageBus>,
         model: String,
-        brave_api_key: Option<String>,
+        web_search: WebSearchConfig,
         exec_timeout_s: u64,
         restrict_to_workspace: bool,
     ) -> Self {
@@ -37,7 +39,7 @@ impl SubagentManager {
             workspace,
             bus,
             model,
-            brave_api_key,
+            web_search,
             exec_timeout_s,
             restrict_to_workspace,
             running_tasks: Arc::new(Mutex::new(HashMap::new())),
@@ -63,7 +65,7 @@ impl SubagentManager {
         let provider = self.provider.clone();
         let workspace = self.workspace.clone();
         let model = self.model.clone();
-        let brave_api_key = self.brave_api_key.clone();
+        let web_search = self.web_search.clone();
         let exec_timeout_s = self.exec_timeout_s;
         let restrict_to_workspace = self.restrict_to_workspace;
         let bus = self.bus.clone();
@@ -78,7 +80,7 @@ impl SubagentManager {
                 provider,
                 workspace,
                 model,
-                brave_api_key,
+                web_search,
                 exec_timeout_s,
                 restrict_to_workspace,
                 task_id_for_run.clone(),
@@ -132,7 +134,7 @@ async fn run_subagent(
     provider: Arc<dyn LLMProvider>,
     workspace: PathBuf,
     model: String,
-    brave_api_key: Option<String>,
+    web_search: WebSearchConfig,
     exec_timeout_s: u64,
     restrict_to_workspace: bool,
     _task_id: String,
@@ -155,8 +157,9 @@ async fn run_subagent(
         None,
         restrict_to_workspace,
     )));
-    tools.register(Arc::new(WebSearchTool::new(brave_api_key, 5)));
+    tools.register(Arc::new(WebSearchTool::from_config(web_search)));
     tools.register(Arc::new(WebFetchTool::new(50_000)));
+    tools.register(Arc::new(HttpRequestTool::new(30, 50_000)));
 
     let system_prompt = format!(
         "# Subagent\n\nYou are a subagent spawned by the main agent to complete a specific task.\n\n## Your Task\n{task}\n\n## Rules\n1. Stay focused - complete only the assigned task, nothing else\n2. Your final response will be reported back to the main agent\n3. Do not initiate conversations or take on side tasks\n4. Be concise but informative in your findings\n\n## What You Can Do\n- Read and write files in the workspace\n- Execute shell commands\n- Search the web and fetch web pages\n\n## What You Cannot Do\n- Send messages directly to users\n- Spawn other subagents\n\n## Workspace\n{}\n",
