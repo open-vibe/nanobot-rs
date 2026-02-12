@@ -2,6 +2,7 @@ use crate::cron::{CronSchedule, CronService};
 use crate::tools::base::Tool;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
+use chrono::{Local, NaiveDateTime, TimeZone};
 use serde_json::{Map, Value, json};
 use std::sync::{Arc, Mutex};
 
@@ -50,6 +51,7 @@ impl Tool for CronTool {
                 "message": { "type": "string" },
                 "every_seconds": { "type": "integer" },
                 "cron_expr": { "type": "string" },
+                "at": { "type": "string" },
                 "job_id": { "type": "string" }
             },
             "required": ["action"]
@@ -72,6 +74,22 @@ impl Tool for CronTool {
 }
 
 impl CronTool {
+    fn parse_at_ms(raw: &str) -> Result<i64> {
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(raw) {
+            return Ok(dt.timestamp_millis());
+        }
+
+        let parse_local = |fmt: &str| -> Option<i64> {
+            let naive = NaiveDateTime::parse_from_str(raw, fmt).ok()?;
+            let local = Local.from_local_datetime(&naive).single()?;
+            Some(local.timestamp_millis())
+        };
+
+        parse_local("%Y-%m-%dT%H:%M:%S")
+            .or_else(|| parse_local("%Y-%m-%d %H:%M:%S"))
+            .ok_or_else(|| anyhow!("invalid at datetime: expected ISO datetime string"))
+    }
+
     async fn add_job(&self, params: &Map<String, Value>) -> Result<String> {
         let message = params
             .get("message")
@@ -95,6 +113,8 @@ impl CronTool {
 
         let every_seconds = params.get("every_seconds").and_then(Value::as_i64);
         let cron_expr = params.get("cron_expr").and_then(Value::as_str);
+        let at = params.get("at").and_then(Value::as_str);
+        let mut delete_after_run = false;
         let schedule = if let Some(seconds) = every_seconds {
             CronSchedule {
                 kind: "every".to_string(),
@@ -107,8 +127,16 @@ impl CronTool {
                 expr: Some(expr.to_string()),
                 ..Default::default()
             }
+        } else if let Some(at_raw) = at {
+            let at_ms = Self::parse_at_ms(at_raw)?;
+            delete_after_run = true;
+            CronSchedule {
+                kind: "at".to_string(),
+                at_ms: Some(at_ms),
+                ..Default::default()
+            }
         } else {
-            return Ok("Error: either every_seconds or cron_expr is required".to_string());
+            return Ok("Error: either every_seconds, cron_expr, or at is required".to_string());
         };
 
         let job = self
@@ -120,7 +148,7 @@ impl CronTool {
                 true,
                 Some(channel),
                 Some(chat_id),
-                false,
+                delete_after_run,
             )
             .await?;
         Ok(format!("Created job '{}' (id: {})", job.name, job.id))
@@ -147,5 +175,22 @@ impl CronTool {
         } else {
             Ok(format!("Job {job_id} not found"))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CronTool;
+
+    #[test]
+    fn parse_at_ms_accepts_rfc3339() {
+        let ts = CronTool::parse_at_ms("2026-02-12T10:30:00+08:00").expect("timestamp");
+        assert!(ts > 0);
+    }
+
+    #[test]
+    fn parse_at_ms_rejects_invalid() {
+        let err = CronTool::parse_at_ms("not-a-time").expect_err("should fail");
+        assert!(err.to_string().contains("invalid at datetime"));
     }
 }
