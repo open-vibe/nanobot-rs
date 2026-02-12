@@ -310,7 +310,7 @@ impl FeishuChannel {
 
                     let _ = LarkWsClient::open(ws_config, handler).await;
                     if running.load(Ordering::Relaxed) {
-                        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     }
                 }
             });

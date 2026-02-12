@@ -158,9 +158,19 @@ impl Channel for DingTalkChannel {
             });
 
             *self.client.lock().await = Some(client.clone());
-            let connect_result = client.connect().await;
+            while self.running.load(Ordering::Relaxed) {
+                let connect_result = client.clone().connect().await;
+                if !self.running.load(Ordering::Relaxed) {
+                    break;
+                }
+                if let Err(err) = connect_result {
+                    eprintln!("DingTalk stream error: {err}");
+                } else {
+                    eprintln!("DingTalk stream disconnected unexpectedly.");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            }
             self.running.store(false, Ordering::Relaxed);
-            connect_result?;
             Ok(())
         }
     }

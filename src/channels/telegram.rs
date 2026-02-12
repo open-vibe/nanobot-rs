@@ -116,20 +116,37 @@ mod tests {
 }
 
 impl TelegramChannel {
+    fn build_http_client(proxy: Option<&str>) -> Client {
+        let base_builder = || {
+            Client::builder()
+                .connect_timeout(std::time::Duration::from_secs(30))
+                .timeout(std::time::Duration::from_secs(60))
+                .pool_max_idle_per_host(16)
+        };
+
+        if let Some(proxy_url) = proxy {
+            match Proxy::all(proxy_url) {
+                Ok(proxy) => base_builder().proxy(proxy).build().unwrap_or_else(|err| {
+                    eprintln!("Telegram HTTP client build with proxy failed ({proxy_url}): {err}");
+                    base_builder().build().unwrap_or_else(|_| Client::new())
+                }),
+                Err(err) => {
+                    eprintln!("Telegram proxy URL is invalid ({proxy_url}): {err}");
+                    base_builder().build().unwrap_or_else(|_| Client::new())
+                }
+            }
+        } else {
+            base_builder().build().unwrap_or_else(|_| Client::new())
+        }
+    }
+
     pub fn new(
         config: TelegramConfig,
         bus: Arc<MessageBus>,
         groq_api_key: String,
         session_manager: Option<Arc<SessionManager>>,
     ) -> Self {
-        let client = if let Some(proxy_url) = &config.proxy {
-            match Proxy::all(proxy_url).and_then(|proxy| Client::builder().proxy(proxy).build()) {
-                Ok(client) => client,
-                Err(_) => Client::new(),
-            }
-        } else {
-            Client::new()
-        };
+        let client = Self::build_http_client(config.proxy.as_deref());
         Self {
             config,
             bus,
@@ -504,11 +521,24 @@ impl Channel for TelegramChannel {
                 .await;
 
             let Ok(response) = response else {
+                if let Err(err) = response {
+                    eprintln!("Telegram polling request error: {err}");
+                }
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 continue;
             };
-            let body: Value = response.json().await.unwrap_or_else(|_| json!({}));
+            let body: Value = match response.json().await {
+                Ok(body) => body,
+                Err(err) => {
+                    eprintln!("Telegram polling decode error: {err}");
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    continue;
+                }
+            };
             if !body.get("ok").and_then(Value::as_bool).unwrap_or(false) {
+                if let Some(desc) = body.get("description").and_then(Value::as_str) {
+                    eprintln!("Telegram polling returned not ok: {desc}");
+                }
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 continue;
             }
@@ -518,7 +548,9 @@ impl Channel for TelegramChannel {
                     if let Some(update_id) = update.get("update_id").and_then(Value::as_i64) {
                         *self.offset.lock().await = update_id + 1;
                     }
-                    let _ = self.handle_update(update).await;
+                    if let Err(err) = self.handle_update(update).await {
+                        eprintln!("Telegram update handling error: {err}");
+                    }
                 }
             }
         }

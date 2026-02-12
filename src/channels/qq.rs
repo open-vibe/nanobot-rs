@@ -172,9 +172,19 @@ impl Channel for QQChannel {
             let mut client = botrs::Client::new(token, intents, handler, false)
                 .map_err(|e| anyhow!("failed to create QQ client: {e}"))?;
 
-            let run_result = client.start().await;
+            while self.running.load(Ordering::Relaxed) {
+                let run_result = client.start().await;
+                if !self.running.load(Ordering::Relaxed) {
+                    break;
+                }
+                if let Err(err) = run_result {
+                    eprintln!("QQ client error: {err}");
+                } else {
+                    eprintln!("QQ client disconnected unexpectedly.");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            }
             self.running.store(false, Ordering::Relaxed);
-            run_result.map_err(|e| anyhow!("QQ client stopped: {e}"))?;
             Ok(())
         }
     }
