@@ -4,6 +4,7 @@ use crate::agent::turn_guard::TurnGuard;
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::config::WebSearchConfig;
 use crate::cron::CronService;
+use crate::memory::MemoryStore;
 use crate::providers::base::LLMProvider;
 use crate::session::SessionManager;
 use crate::tools::cron::CronTool;
@@ -14,7 +15,8 @@ use crate::tools::registry::ToolRegistry;
 use crate::tools::shell::ExecTool;
 use crate::tools::spawn::SpawnTool;
 use crate::tools::web::{WebFetchTool, WebSearchTool};
-use anyhow::Result;
+use anyhow::{Context, Result};
+use chrono::Local;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -27,6 +29,7 @@ pub struct AgentLoop {
     workspace: PathBuf,
     model: String,
     max_iterations: u32,
+    memory_window: usize,
     context: ContextBuilder,
     sessions: Arc<SessionManager>,
     tools: ToolRegistry,
@@ -83,12 +86,34 @@ impl AgentLoop {
         messages
     }
 
+    fn extract_json_object(text: &str) -> Option<Value> {
+        let trimmed = text.trim();
+        if let Ok(value) = serde_json::from_str::<Value>(trimmed)
+            && value.is_object()
+        {
+            return Some(value);
+        }
+        if trimmed.starts_with("```") {
+            let mut lines = trimmed.lines();
+            let _ = lines.next();
+            let body = lines.collect::<Vec<_>>().join("\n");
+            let stripped = body.rsplit_once("```").map(|(v, _)| v).unwrap_or(&body);
+            if let Ok(value) = serde_json::from_str::<Value>(stripped.trim())
+                && value.is_object()
+            {
+                return Some(value);
+            }
+        }
+        None
+    }
+
     pub fn new(
         bus: Arc<MessageBus>,
         provider: Arc<dyn LLMProvider>,
         workspace: PathBuf,
         model: Option<String>,
         max_iterations: u32,
+        memory_window: usize,
         web_search: WebSearchConfig,
         exec_timeout_s: u64,
         restrict_to_workspace: bool,
@@ -150,6 +175,7 @@ impl AgentLoop {
             workspace,
             model: model_name,
             max_iterations,
+            memory_window,
             context,
             sessions,
             tools,
@@ -172,7 +198,7 @@ impl AgentLoop {
                 continue;
             };
 
-            let response = match self.process_message(msg.clone()).await {
+            let response = match self.process_message(msg.clone(), None).await {
                 Ok(resp) => resp,
                 Err(err) => {
                     let mut out = OutboundMessage::new(
@@ -193,12 +219,23 @@ impl AgentLoop {
         self.running.store(false, Ordering::Relaxed);
     }
 
-    async fn process_message(&self, msg: InboundMessage) -> Result<OutboundMessage> {
+    async fn process_message(
+        &self,
+        msg: InboundMessage,
+        session_key: Option<&str>,
+    ) -> Result<OutboundMessage> {
         if msg.channel == "system" {
             return self.process_system_message(msg).await;
         }
 
-        let mut session = self.sessions.get_or_create(&msg.session_key());
+        let mut session = self
+            .sessions
+            .get_or_create(session_key.unwrap_or(&msg.session_key()));
+        if session.messages.len() > self.memory_window {
+            if let Err(err) = self.consolidate_memory(&mut session).await {
+                eprintln!("Warning: memory consolidation failed: {err}");
+            }
+        }
         self.message_tool
             .set_context(msg.channel.clone(), msg.chat_id.clone());
         self.spawn_tool
@@ -219,6 +256,7 @@ impl AgentLoop {
 
         let mut final_content: Option<String> = None;
         let mut retried_with_fresh_context = false;
+        let mut tools_used: Vec<String> = Vec::new();
         let turn_guard = TurnGuard::new(
             self.provider.as_ref(),
             &self.model,
@@ -255,6 +293,7 @@ impl AgentLoop {
                 );
 
                 for tool_call in response.tool_calls {
+                    tools_used.push(tool_call.name.clone());
                     let result = self
                         .tools
                         .execute(&tool_call.name, &tool_call.arguments)
@@ -300,7 +339,7 @@ impl AgentLoop {
         });
 
         session.add_message("user", &msg.content);
-        session.add_message("assistant", &answer);
+        session.add_message_with_tools("assistant", &answer, Some(&tools_used));
         self.sessions.save(&session)?;
 
         let mut outbound = OutboundMessage::new(msg.channel, msg.chat_id, answer);
@@ -424,6 +463,123 @@ impl AgentLoop {
         Ok(OutboundMessage::new(origin_channel, origin_chat_id, answer))
     }
 
+    async fn consolidate_memory(&self, session: &mut crate::session::Session) -> Result<()> {
+        let memory = MemoryStore::new(self.workspace.clone())?;
+        let keep_count = usize::min(10, usize::max(2, self.memory_window / 2));
+        if session.messages.len() <= keep_count {
+            return Ok(());
+        }
+
+        let split_idx = session.messages.len() - keep_count;
+        let old_messages = &session.messages[..split_idx];
+        let mut lines = Vec::new();
+        for msg in old_messages {
+            let Some(content) = msg.get("content").and_then(Value::as_str) else {
+                continue;
+            };
+            if content.trim().is_empty() {
+                continue;
+            }
+            let timestamp = msg
+                .get("timestamp")
+                .and_then(Value::as_str)
+                .unwrap_or("?")
+                .chars()
+                .take(16)
+                .collect::<String>();
+            let role = msg
+                .get("role")
+                .and_then(Value::as_str)
+                .unwrap_or("user")
+                .to_ascii_uppercase();
+            let tools_suffix = msg
+                .get("tools_used")
+                .and_then(Value::as_array)
+                .filter(|tools| !tools.is_empty())
+                .map(|tools| {
+                    let list = tools
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    if list.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" [tools: {list}]")
+                    }
+                })
+                .unwrap_or_default();
+            lines.push(format!(
+                "[{timestamp}] {role}{tools_suffix}: {content}",
+                content = content.trim()
+            ));
+        }
+
+        if lines.is_empty() {
+            session.messages = session.messages[split_idx..].to_vec();
+            self.sessions.save(session)?;
+            return Ok(());
+        }
+
+        let current_memory = memory.read_long_term();
+        let now = Local::now().format("%Y-%m-%d %H:%M").to_string();
+        let prompt = format!(
+            "You are a memory consolidation agent. Process this conversation and return a JSON object with exactly two keys:\n\n\
+1. \"history_entry\": A paragraph (2-5 sentences) summarizing the key events/decisions/topics. Start with a timestamp like [{now}]. Include enough detail to be useful when found by grep search later.\n\n\
+2. \"memory_update\": The updated long-term memory content. Add any new facts: user preferences, personal info, habits, project context, technical decisions, tools/services used. If nothing new, return the existing content unchanged.\n\n\
+## Current Long-term Memory\n{current_memory}\n\n\
+## Conversation to Process\n{conversation}\n\n\
+Respond with ONLY valid JSON, no markdown fences.",
+            current_memory = if current_memory.trim().is_empty() {
+                "(empty)"
+            } else {
+                current_memory.trim()
+            },
+            conversation = lines.join("\n")
+        );
+
+        let response = self
+            .provider
+            .chat(
+                &[
+                    json!({
+                        "role": "system",
+                        "content": "You are a memory consolidation agent. Respond only with valid JSON."
+                    }),
+                    json!({
+                        "role": "user",
+                        "content": prompt
+                    }),
+                ],
+                None,
+                Some(&self.model),
+                1200,
+                0.0,
+            )
+            .await?;
+
+        let parsed = response
+            .content
+            .as_deref()
+            .and_then(Self::extract_json_object)
+            .context("memory consolidation returned non-JSON content")?;
+
+        if let Some(entry) = parsed.get("history_entry").and_then(Value::as_str)
+            && !entry.trim().is_empty()
+        {
+            memory.append_history(entry)?;
+        }
+        if let Some(update) = parsed.get("memory_update").and_then(Value::as_str)
+            && update.trim() != current_memory.trim()
+        {
+            memory.write_long_term(update)?;
+        }
+
+        session.messages = session.messages[split_idx..].to_vec();
+        self.sessions.save(session)?;
+        Ok(())
+    }
+
     pub async fn process_direct(
         &self,
         content: &str,
@@ -440,7 +596,7 @@ impl AgentLoop {
         let chat_id = chat_id.unwrap_or(&default_chat_id);
 
         let msg = InboundMessage::new(channel, "user", chat_id, content);
-        let response = self.process_message(msg).await?;
+        let response = self.process_message(msg, Some(session_key)).await?;
         Ok(response.content)
     }
 

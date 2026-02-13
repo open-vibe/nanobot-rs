@@ -57,6 +57,7 @@ pub struct AgentDefaults {
     pub max_tokens: u32,
     pub temperature: f32,
     pub max_tool_iterations: u32,
+    pub memory_window: usize,
 }
 
 impl Default for AgentDefaults {
@@ -67,6 +68,7 @@ impl Default for AgentDefaults {
             max_tokens: 8192,
             temperature: 0.7,
             max_tool_iterations: 20,
+            memory_window: 50,
         }
     }
 }

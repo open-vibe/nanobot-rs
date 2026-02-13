@@ -19,7 +19,7 @@ English: [README.en.md](README.en.md)
 
 - Agent 主循环：LLM 调用、工具调用、会话上下文、错误恢复
 - 配置系统：`~/.nanobot/config.json`，支持 provider 自动匹配
-- 会话与记忆：JSONL 会话持久化 + `memory/MEMORY.md`
+- 会话与记忆：JSONL 会话持久化 + 二层记忆（`memory/MEMORY.md` + `memory/HISTORY.md`）
 - 多模态输入：会将入站图片附件转换为 OpenAI 兼容的 `image_url` 内容片段
 - 工具系统：
   - `read_file` / `write_file` / `edit_file` / `list_dir`
@@ -58,7 +58,7 @@ English: [README.en.md](README.en.md)
 cargo run -- onboard
 ```
 
-该步骤会初始化工作区基础结构，包括 `memory/MEMORY.md` 与用于本地自定义技能的 `skills/` 目录。
+该步骤会初始化工作区基础结构，包括 `memory/MEMORY.md`、`memory/HISTORY.md` 与用于本地自定义技能的 `skills/` 目录。
 
 ### 2. 配置 API Key
 

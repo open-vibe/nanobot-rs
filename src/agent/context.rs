@@ -37,7 +37,7 @@ impl ContextBuilder {
         let runtime = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
         let workspace = self.workspace.display().to_string();
         parts.push(format!(
-            "# nanobot-rs\n\nYou are nanobot, a helpful AI assistant.\n\n## Current Time\n{now} ({tz})\n\n## Runtime\n{runtime}\n\n## Workspace\n{workspace}\n- Memory files: {workspace}/memory/MEMORY.md\n- Daily notes: {workspace}/memory/YYYY-MM-DD.md\n\nIMPORTANT: Respond directly in text for normal chat.\nOnly use the 'message' tool for proactive channel messages.\nAlways be helpful, accurate, and concise. When using tools, think step by step: what you know, what you need, and why you chose this tool.\nWhen remembering something, write to {workspace}/memory/MEMORY.md"
+            "# nanobot-rs\n\nYou are nanobot, a helpful AI assistant.\n\n## Current Time\n{now} ({tz})\n\n## Runtime\n{runtime}\n\n## Workspace\n{workspace}\n- Long-term memory: {workspace}/memory/MEMORY.md\n- History log: {workspace}/memory/HISTORY.md (grep-searchable)\n\nIMPORTANT: Respond directly in text for normal chat.\nOnly use the 'message' tool for proactive channel messages.\nAlways be helpful, accurate, and concise. When using tools, think step by step: what you know, what you need, and why you chose this tool.\nWhen remembering something important, write to {workspace}/memory/MEMORY.md\nTo recall past events, grep {workspace}/memory/HISTORY.md"
         ));
 
         let bootstrap_files = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md"];

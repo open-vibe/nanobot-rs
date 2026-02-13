@@ -215,6 +215,11 @@ fn cmd_onboard() -> Result<()> {
         )?;
         println!("Created {}", memory_file.display());
     }
+    let history_file = memory_dir.join("HISTORY.md");
+    if !history_file.exists() {
+        std::fs::write(&history_file, "")?;
+        println!("Created {}", history_file.display());
+    }
 
     let skills_dir = workspace.join("skills");
     std::fs::create_dir_all(&skills_dir)?;
@@ -367,6 +372,7 @@ async fn cmd_gateway(port: u16, _verbose: bool) -> Result<()> {
         config.workspace_path(),
         Some(model.clone()),
         config.agents.defaults.max_tool_iterations,
+        config.agents.defaults.memory_window,
         config.tools.web.search.clone(),
         config.tools.exec.timeout,
         config.tools.restrict_to_workspace,
@@ -492,6 +498,7 @@ async fn cmd_agent(message: Option<String>, session: &str) -> Result<()> {
         config.workspace_path(),
         Some(model.clone()),
         config.agents.defaults.max_tool_iterations,
+        config.agents.defaults.memory_window,
         config.tools.web.search.clone(),
         config.tools.exec.timeout,
         config.tools.restrict_to_workspace,
@@ -1112,6 +1119,7 @@ async fn cmd_cron(command: CronCommand) -> Result<()> {
                 config.workspace_path(),
                 Some(model),
                 config.agents.defaults.max_tool_iterations,
+                config.agents.defaults.memory_window,
                 config.tools.web.search.clone(),
                 config.tools.exec.timeout,
                 config.tools.restrict_to_workspace,

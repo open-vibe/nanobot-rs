@@ -29,11 +29,31 @@ impl Session {
     }
 
     pub fn add_message(&mut self, role: &str, content: &str) {
-        self.messages.push(json!({
+        self.add_message_with_tools(role, content, None);
+    }
+
+    pub fn add_message_with_tools(
+        &mut self,
+        role: &str,
+        content: &str,
+        tools_used: Option<&[String]>,
+    ) {
+        let mut message = json!({
             "role": role,
             "content": content,
             "timestamp": timestamp(),
-        }));
+        });
+        if let Some(tools) = tools_used
+            && !tools.is_empty()
+        {
+            message["tools_used"] = Value::Array(
+                tools
+                    .iter()
+                    .map(|tool| Value::String(tool.clone()))
+                    .collect(),
+            );
+        }
+        self.messages.push(message);
         self.updated_at = Local::now();
     }
 
