@@ -231,8 +231,35 @@ impl AgentLoop {
         let mut session = self
             .sessions
             .get_or_create(session_key.unwrap_or(&msg.session_key()));
+
+        let cmd = msg.content.trim().to_ascii_lowercase();
+        if cmd == "/new" || cmd == "/reset" {
+            if let Err(err) = self.consolidate_memory(&mut session, true).await {
+                eprintln!("Warning: memory consolidation failed: {err}");
+            }
+            session.messages.clear();
+            self.sessions.save(&session)?;
+
+            let mut outbound = OutboundMessage::new(
+                msg.channel,
+                msg.chat_id,
+                "🐈 New session started. Memory consolidated.".to_string(),
+            );
+            outbound.metadata = msg.metadata;
+            return Ok(outbound);
+        }
+        if cmd == "/help" {
+            let mut outbound = OutboundMessage::new(
+                msg.channel,
+                msg.chat_id,
+                "🐈 nanobot commands:\n/new - Start a new conversation\n/help - Show available commands".to_string(),
+            );
+            outbound.metadata = msg.metadata;
+            return Ok(outbound);
+        }
+
         if session.messages.len() > self.memory_window {
-            if let Err(err) = self.consolidate_memory(&mut session).await {
+            if let Err(err) = self.consolidate_memory(&mut session, false).await {
                 eprintln!("Warning: memory consolidation failed: {err}");
             }
         }
@@ -257,6 +284,7 @@ impl AgentLoop {
         let mut final_content: Option<String> = None;
         let mut retried_with_fresh_context = false;
         let mut tools_used: Vec<String> = Vec::new();
+        let mut iterations_run = 0u32;
         let turn_guard = TurnGuard::new(
             self.provider.as_ref(),
             &self.model,
@@ -264,6 +292,7 @@ impl AgentLoop {
             self.max_iterations,
         );
         for iteration in 1..=self.max_iterations {
+            iterations_run = iteration;
             let tool_defs = self.tools.get_definitions();
             let response = self
                 .provider
@@ -335,7 +364,14 @@ impl AgentLoop {
         }
 
         let answer = final_content.unwrap_or_else(|| {
-            "I've completed processing but have no response to give.".to_string()
+            if iterations_run >= self.max_iterations {
+                format!(
+                    "Reached {} iterations without completion.",
+                    self.max_iterations
+                )
+            } else {
+                "I've completed processing but have no response to give.".to_string()
+            }
         });
 
         session.add_message("user", &msg.content);
@@ -463,14 +499,26 @@ impl AgentLoop {
         Ok(OutboundMessage::new(origin_channel, origin_chat_id, answer))
     }
 
-    async fn consolidate_memory(&self, session: &mut crate::session::Session) -> Result<()> {
+    async fn consolidate_memory(
+        &self,
+        session: &mut crate::session::Session,
+        archive_all: bool,
+    ) -> Result<()> {
         let memory = MemoryStore::new(self.workspace.clone())?;
-        let keep_count = usize::min(10, usize::max(2, self.memory_window / 2));
-        if session.messages.len() <= keep_count {
+        if session.messages.is_empty() {
             return Ok(());
         }
 
-        let split_idx = session.messages.len() - keep_count;
+        let keep_count = if archive_all {
+            0
+        } else {
+            usize::min(10, usize::max(2, self.memory_window / 2))
+        };
+        if !archive_all && session.messages.len() <= keep_count {
+            return Ok(());
+        }
+
+        let split_idx = session.messages.len().saturating_sub(keep_count);
         let old_messages = &session.messages[..split_idx];
         let mut lines = Vec::new();
         for msg in old_messages {
@@ -575,7 +623,11 @@ Respond with ONLY valid JSON, no markdown fences.",
             memory.write_long_term(update)?;
         }
 
-        session.messages = session.messages[split_idx..].to_vec();
+        if keep_count == 0 {
+            session.messages.clear();
+        } else {
+            session.messages = session.messages[split_idx..].to_vec();
+        }
         self.sessions.save(session)?;
         Ok(())
     }

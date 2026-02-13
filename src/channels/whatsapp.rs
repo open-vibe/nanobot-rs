@@ -69,6 +69,17 @@ impl Channel for WhatsAppChannel {
                 }
             });
 
+            if !self.config.bridge_token.is_empty() {
+                let auth_payload = json!({
+                    "type": "auth",
+                    "token": self.config.bridge_token
+                })
+                .to_string();
+                if let Some(tx) = self.outbound_tx.lock().await.clone() {
+                    let _ = tx.send(auth_payload);
+                }
+            }
+
             while self.running.load(Ordering::Relaxed) {
                 let Some(msg) = read.next().await else {
                     break;

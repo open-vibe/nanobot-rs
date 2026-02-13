@@ -207,6 +207,7 @@ pub struct TelegramConfig {
 pub struct WhatsAppConfig {
     pub enabled: bool,
     pub bridge_url: String,
+    pub bridge_token: String,
     pub allow_from: Vec<String>,
 }
 
@@ -215,6 +216,7 @@ impl Default for WhatsAppConfig {
         Self {
             enabled: false,
             bridge_url: "ws://localhost:3001".to_string(),
+            bridge_token: String::new(),
             allow_from: Vec::new(),
         }
     }

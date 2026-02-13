@@ -147,9 +147,9 @@ impl FeishuChannel {
         let mut elements = Vec::new();
         let mut last_end = 0usize;
         for m in table_re.find_iter(content) {
-            let before = content[last_end..m.start()].trim();
-            if !before.is_empty() {
-                elements.push(json!({"tag":"markdown","content": before}));
+            let before = &content[last_end..m.start()];
+            if !before.trim().is_empty() {
+                elements.extend(Self::split_headings(before));
             }
             let raw_table = m.as_str();
             if let Some(parsed) = Self::parse_md_table(raw_table) {
@@ -159,14 +159,74 @@ impl FeishuChannel {
             }
             last_end = m.end();
         }
-        let remaining = content[last_end..].trim();
-        if !remaining.is_empty() {
-            elements.push(json!({"tag":"markdown","content": remaining}));
+        let remaining = &content[last_end..];
+        if !remaining.trim().is_empty() {
+            elements.extend(Self::split_headings(remaining));
         }
         if elements.is_empty() {
             elements.push(json!({"tag":"markdown","content": content}));
         }
         elements
+    }
+
+    fn split_headings(content: &str) -> Vec<Value> {
+        let heading_re = Regex::new(r"(?m)^(#{1,6})\s+(.+)$").expect("valid heading regex");
+        let code_block_re = Regex::new(r"(?ms)(```[\s\S]*?```)").expect("valid code block regex");
+
+        let mut protected = content.to_string();
+        let mut code_blocks = Vec::new();
+        for cap in code_block_re.captures_iter(content) {
+            if let Some(m) = cap.get(1) {
+                code_blocks.push(m.as_str().to_string());
+            }
+        }
+        for (idx, block) in code_blocks.iter().enumerate() {
+            let token = format!("\u{0000}CODE{idx}\u{0000}");
+            protected = protected.replacen(block, &token, 1);
+        }
+
+        let mut elements = Vec::new();
+        let mut last_end = 0usize;
+        for cap in heading_re.captures_iter(&protected) {
+            let Some(m) = cap.get(0) else {
+                continue;
+            };
+            let before = protected[last_end..m.start()].trim();
+            if !before.is_empty() {
+                elements.push(json!({"tag":"markdown","content": before}));
+            }
+            let text = cap.get(2).map(|v| v.as_str().trim()).unwrap_or_default();
+            elements.push(json!({
+                "tag":"div",
+                "text": {
+                    "tag":"lark_md",
+                    "content": format!("**{text}**"),
+                }
+            }));
+            last_end = m.end();
+        }
+        let remaining = protected[last_end..].trim();
+        if !remaining.is_empty() {
+            elements.push(json!({"tag":"markdown","content": remaining}));
+        }
+
+        for (idx, block) in code_blocks.iter().enumerate() {
+            let token = format!("\u{0000}CODE{idx}\u{0000}");
+            for element in &mut elements {
+                if element.get("tag").and_then(Value::as_str) == Some("markdown")
+                    && let Some(content) = element.get_mut("content")
+                    && let Some(text) = content.as_str()
+                {
+                    *content = Value::String(text.replace(&token, block));
+                }
+            }
+        }
+
+        if elements.is_empty() {
+            vec![json!({"tag":"markdown","content": content})]
+        } else {
+            elements
+        }
     }
 
     #[cfg(feature = "feishu-websocket")]

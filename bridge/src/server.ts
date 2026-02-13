@@ -11,6 +11,11 @@ interface SendCommand {
   text: string;
 }
 
+interface AuthCommand {
+  type: 'auth';
+  token: string;
+}
+
 interface BridgeMessage {
   type: 'message' | 'status' | 'qr' | 'error';
   [key: string]: unknown;
@@ -20,13 +25,25 @@ export class BridgeServer {
   private wss: WebSocketServer | null = null;
   private wa: WhatsAppClient | null = null;
   private clients: Set<WebSocket> = new Set();
+  private authenticatedClients: WeakSet<WebSocket> = new WeakSet();
+  private requireAuth: boolean;
 
-  constructor(private port: number, private authDir: string) {}
+  constructor(
+    private port: number,
+    private authDir: string,
+    private host: string,
+    private bridgeToken: string,
+  ) {
+    this.requireAuth = this.bridgeToken.length > 0;
+  }
 
   async start(): Promise<void> {
     // Create WebSocket server
-    this.wss = new WebSocketServer({ port: this.port });
-    console.log(`🌉 Bridge server listening on ws://localhost:${this.port}`);
+    this.wss = new WebSocketServer({ port: this.port, host: this.host });
+    console.log(`🌉 Bridge server listening on ws://${this.host}:${this.port}`);
+    if (this.requireAuth) {
+      console.log('🔐 Bridge token auth is enabled');
+    }
 
     // Initialize WhatsApp client
     this.wa = new WhatsAppClient({
@@ -43,7 +60,24 @@ export class BridgeServer {
 
       ws.on('message', async (data) => {
         try {
-          const cmd = JSON.parse(data.toString()) as SendCommand;
+          const cmd = JSON.parse(data.toString()) as SendCommand | AuthCommand;
+          if (cmd.type === 'auth') {
+            const token = typeof cmd.token === 'string' ? cmd.token : '';
+            if (!this.requireAuth || token === this.bridgeToken) {
+              this.authenticatedClients.add(ws);
+              ws.send(JSON.stringify({ type: 'status', status: 'authenticated' }));
+            } else {
+              ws.send(JSON.stringify({ type: 'error', error: 'invalid auth token' }));
+              ws.close();
+            }
+            return;
+          }
+
+          if (this.requireAuth && !this.authenticatedClients.has(ws)) {
+            ws.send(JSON.stringify({ type: 'error', error: 'authentication required' }));
+            return;
+          }
+
           await this.handleCommand(cmd);
           ws.send(JSON.stringify({ type: 'sent', to: cmd.to }));
         } catch (error) {
@@ -67,7 +101,10 @@ export class BridgeServer {
     await this.wa.connect();
   }
 
-  private async handleCommand(cmd: SendCommand): Promise<void> {
+  private async handleCommand(cmd: SendCommand | AuthCommand): Promise<void> {
+    if (cmd.type === 'auth') {
+      return;
+    }
     if (cmd.type === 'send' && this.wa) {
       await this.wa.sendMessage(cmd.to, cmd.text);
     }

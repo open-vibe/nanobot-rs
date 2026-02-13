@@ -2,7 +2,6 @@ use crate::bus::{MessageBus, OutboundMessage};
 use crate::channels::base::Channel;
 use crate::config::TelegramConfig;
 use crate::providers::transcription::GroqTranscriptionProvider;
-use crate::session::SessionManager;
 use anyhow::Result;
 use async_trait::async_trait;
 use html_escape::encode_text;
@@ -88,7 +87,6 @@ pub struct TelegramChannel {
     client: Client,
     offset: Mutex<i64>,
     groq_api_key: String,
-    session_manager: Option<Arc<SessionManager>>,
     typing_tasks: Mutex<HashMap<String, JoinHandle<()>>>,
 }
 
@@ -140,12 +138,7 @@ impl TelegramChannel {
         }
     }
 
-    pub fn new(
-        config: TelegramConfig,
-        bus: Arc<MessageBus>,
-        groq_api_key: String,
-        session_manager: Option<Arc<SessionManager>>,
-    ) -> Self {
+    pub fn new(config: TelegramConfig, bus: Arc<MessageBus>, groq_api_key: String) -> Self {
         let client = Self::build_http_client(config.proxy.as_deref());
         Self {
             config,
@@ -154,7 +147,6 @@ impl TelegramChannel {
             client,
             offset: Mutex::new(0),
             groq_api_key,
-            session_manager,
             typing_tasks: Mutex::new(HashMap::new()),
         }
     }
@@ -311,6 +303,11 @@ impl TelegramChannel {
         let mut media_paths = Vec::new();
         if let Some(text) = message.get("text").and_then(Value::as_str) {
             if text.starts_with('/') {
+                let sender_id = if let Some(username) = username {
+                    format!("{user_id}|{username}")
+                } else {
+                    user_id.to_string()
+                };
                 let command = text
                     .trim_start_matches('/')
                     .split_whitespace()
@@ -334,32 +331,14 @@ impl TelegramChannel {
                         )
                         .await;
                     }
-                    "help" => {
-                        self.send_text_message(
-                            &chat_id,
-                            "nanobot commands:\n/start - Start the bot\n/reset - Reset conversation history\n/help - Show this help message",
-                            None,
-                        )
-                        .await;
-                    }
-                    "reset" => {
-                        if let Some(session_manager) = &self.session_manager {
-                            let session_key = format!("{}:{}", self.name(), chat_id);
-                            let _ = session_manager.delete(&session_key);
-                            self.send_text_message(
-                                &chat_id,
-                                "Conversation history cleared. Let's start fresh!",
-                                None,
-                            )
-                            .await;
+                    "help" | "new" | "reset" => {
+                        let forwarded = if command == "reset" {
+                            "/new".to_string()
                         } else {
-                            self.send_text_message(
-                                &chat_id,
-                                "Session management is not available.",
-                                None,
-                            )
-                            .await;
-                        }
+                            format!("/{command}")
+                        };
+                        self.handle_message(sender_id, chat_id, forwarded, Vec::new(), Map::new())
+                            .await?;
                     }
                     _ => {}
                 }

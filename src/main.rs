@@ -41,7 +41,7 @@ enum Commands {
     Agent {
         #[arg(short, long)]
         message: Option<String>,
-        #[arg(short, long, default_value = "cli:default")]
+        #[arg(short, long, default_value = "cli:direct")]
         session: String,
     },
     Status,
@@ -428,11 +428,7 @@ async fn cmd_gateway(port: u16, _verbose: bool) -> Result<()> {
         .await;
     heartbeat.start().await;
 
-    let channels = Arc::new(ChannelManager::new(
-        &config,
-        bus.clone(),
-        Some(session_manager),
-    ));
+    let channels = Arc::new(ChannelManager::new(&config, bus.clone()));
     let enabled_channels = channels.enabled_channels();
     if enabled_channels.is_empty() {
         println!("Warning: No channels enabled");
@@ -486,11 +482,7 @@ async fn cmd_agent(message: Option<String>, session: &str) -> Result<()> {
     let session_manager = Arc::new(SessionManager::new()?);
     let cron_store_path = get_data_path()?.join("cron").join("jobs.json");
     let cron = Arc::new(CronService::new(cron_store_path));
-    let channels = Arc::new(ChannelManager::new(
-        &config,
-        bus.clone(),
-        Some(session_manager.clone()),
-    ));
+    let channels = Arc::new(ChannelManager::new(&config, bus.clone()));
 
     let agent_loop = Arc::new(AgentLoop::new(
         bus.clone(),
@@ -902,10 +894,18 @@ async fn cmd_channels(command: ChannelCommand) -> Result<()> {
 }
 
 async fn cmd_channels_login() -> Result<()> {
+    let config = load_config(None).unwrap_or_default();
     let bridge_dir = prepare_bridge_dir().await?;
     println!("Starting WhatsApp bridge...");
     println!("Scan the QR code in the terminal to connect.\n");
-    run_npm(&["start"], &bridge_dir).await
+    let mut env_vars = Vec::new();
+    if !config.channels.whatsapp.bridge_token.is_empty() {
+        env_vars.push((
+            "BRIDGE_TOKEN".to_string(),
+            config.channels.whatsapp.bridge_token.clone(),
+        ));
+    }
+    run_npm(&["start"], &bridge_dir, &env_vars).await
 }
 
 async fn prepare_bridge_dir() -> Result<PathBuf> {
@@ -929,9 +929,9 @@ async fn prepare_bridge_dir() -> Result<PathBuf> {
     copy_bridge_tree(&source, &user_bridge)?;
 
     println!("Installing bridge dependencies...");
-    run_npm(&["install"], &user_bridge).await?;
+    run_npm(&["install"], &user_bridge, &[] as &[(String, String)]).await?;
     println!("Building bridge...");
-    run_npm(&["run", "build"], &user_bridge).await?;
+    run_npm(&["run", "build"], &user_bridge, &[] as &[(String, String)]).await?;
     println!("Bridge ready at {}\n", user_bridge.display());
     Ok(user_bridge)
 }
@@ -984,15 +984,20 @@ fn copy_bridge_tree(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn run_npm(args: &[&str], cwd: &Path) -> Result<()> {
-    let status = Command::new("npm")
+async fn run_npm(args: &[&str], cwd: &Path, env_vars: &[(String, String)]) -> Result<()> {
+    let mut command = Command::new("npm");
+    command
         .args(args)
         .current_dir(cwd)
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit())
-        .status()
-        .await?;
+        .stderr(std::process::Stdio::inherit());
+
+    for (key, value) in env_vars {
+        command.env(key, value);
+    }
+
+    let status = command.status().await?;
     if status.success() {
         Ok(())
     } else {
@@ -1108,11 +1113,7 @@ async fn cmd_cron(command: CronCommand) -> Result<()> {
                 api_key.unwrap_or_else(|| "dummy".to_string()),
             );
             let session_manager = Arc::new(SessionManager::new()?);
-            let channels = Arc::new(ChannelManager::new(
-                &config,
-                bus.clone(),
-                Some(session_manager.clone()),
-            ));
+            let channels = Arc::new(ChannelManager::new(&config, bus.clone()));
             let agent = Arc::new(AgentLoop::new(
                 bus.clone(),
                 provider,
