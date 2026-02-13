@@ -2,7 +2,7 @@
 
 中文文档: [README.md](README.md)
 
-## Ultra-Lightweight Personal AI Assistant, Rust Edition
+## 🚀 Ultra-Lightweight Personal AI Assistant, Rust Edition
 
 `nanobot-rs` is the Rust version of [`HKUDS/nanobot`](https://github.com/HKUDS/nanobot), keeping the same ultra-lightweight agent philosophy and tool-driven workflow.
 
@@ -11,11 +11,11 @@
 - Evolving as one of the core runtimes for `open-vibe`
 - Inspired by [`OpenClaw`](https://github.com/openclaw/openclaw)
 
-## Open Vibe Integration
+## 🔗 Open Vibe Integration
 
 - Current Open Vibe integration focus: DingTalk stream bridge + relay workflow into Open Vibe threads
 
-## Features
+## ✨ Features
 
 - Agent loop: LLM calls, tool execution, session context, and error handling
 - Config system: `~/.nanobot/config.json` with provider auto-matching
@@ -45,9 +45,12 @@
   - `health` / `doctor --fix` / `update`
   - `pairing list|approve|reject` (DM-style allowlist pairing workflow)
   - `sessions list|show|delete`
-  - WebUI (`webui`) with terminal-cli style control dashboard
+  - `webui` terminal-style control dashboard with:
+    - interactive chat (`POST /api/chat`)
+    - bilingual UI (English/Chinese auto switch by browser language)
+    - one-screen layout (desktop page no-scroll, pane-level scrolling)
 
-## Requirements
+## 📦 Requirements
 
 - Rust stable (recommended 1.85+)
 - Optional:
@@ -55,7 +58,7 @@
   - Brave Search API key (`web_search`, optional; falls back to keyless DuckDuckGo search when missing)
   - Groq API key (audio transcription)
 
-## Quick Start
+## ⚡ Quick Start
 
 ### 1. Initialize
 
@@ -283,7 +286,7 @@ cargo run -- agent -m "Hello"
 cargo run -- gateway
 ```
 
-### 5. Start WebUI (terminal-cli style)
+### 5. Start WebUI (terminal-cli style + chat)
 
 ```bash
 cargo run -- webui --host 127.0.0.1 --port 18890
@@ -291,7 +294,18 @@ cargo run -- webui --host 127.0.0.1 --port 18890
 
 Then open `http://127.0.0.1:18890`.
 
-## Windows Service (NSSM)
+You can chat directly in the WebUI chat panel.  
+Default session key in UI is `webui:default`.
+
+### 6. WebUI Chat API
+
+```bash
+curl -X POST http://127.0.0.1:18890/api/chat \
+  -H "Content-Type: application/json" \
+  -d "{\"message\":\"Hello\",\"session\":\"webui:default\"}"
+```
+
+## 🪟 Windows Service (NSSM)
 
 `nanobot-rs` can run as a Windows background service via `nssm`, with built-in commands:
 
@@ -361,7 +375,7 @@ Remove-Item Env:NANOBOT_SERVICE_PASSWORD
 - `Error 1069` usually means invalid service credentials or missing "Log on as a service" permission.
 - If you see "marked for deletion", close `services.msc` / Event Viewer, wait a few seconds, and retry. Reboot if needed.
 
-## Common Commands
+## 🧰 Common Commands
 
 ```bash
 # Status and version
@@ -377,6 +391,11 @@ cargo run -- agent
 
 # WebUI
 cargo run -- webui
+
+# WebUI chat API
+curl -X POST http://127.0.0.1:18890/api/chat \
+  -H "Content-Type: application/json" \
+  -d "{\"message\":\"Hello\",\"session\":\"webui:default\"}"
 
 # Channels
 cargo run -- channels status
@@ -402,7 +421,7 @@ cargo run -- cron remove <job_id>
 
 Interactive exit commands: `exit`, `quit`, `/exit`, `/quit`, `:q`, or `Ctrl+C`/`Ctrl+D`.
 
-## Feishu WebSocket Receive
+## 📨 Feishu WebSocket Receive
 
 Default build supports Feishu sending. To enable Feishu WebSocket receive:
 
@@ -410,7 +429,7 @@ Default build supports Feishu sending. To enable Feishu WebSocket receive:
 cargo run --features feishu-websocket -- gateway
 ```
 
-## DingTalk Stream Receive
+## 📡 DingTalk Stream Receive
 
 Default builds do not include DingTalk Stream. Enable it with:
 
@@ -418,7 +437,7 @@ Default builds do not include DingTalk Stream. Enable it with:
 cargo run --features dingtalk-stream -- gateway
 ```
 
-## Mochat Channel (Claw IM)
+## 💬 Mochat Channel (Claw IM)
 
 Disabled by default. Once enabled, nanobot-rs uses HTTP watch/polling to receive and send messages.
 
@@ -466,7 +485,7 @@ cargo run -- gateway
 - Direct sessions use `session_xxx` targets
 - Group/panel messaging uses panel/group targets
 
-## QQ Channel (Direct/Private Chat Only)
+## 🐧 QQ Channel (Direct/Private Chat Only)
 
 QQ support is disabled by default; enable it via the `qq-botrs` feature.
 
@@ -491,7 +510,7 @@ cargo run --features qq-botrs -- gateway
 
 After startup, send a direct QQ message to the bot and it should reply.
 
-## Slack Channel
+## 🧩 Slack Channel
 
 Uses Socket Mode, so no public callback URL is required.
 
@@ -536,7 +555,7 @@ cargo run -- gateway
 
 You can DM the bot directly, or @mention it in a channel.
 
-## WhatsApp Login
+## 📱 WhatsApp Login
 
 `channels login` will automatically:
 
@@ -545,7 +564,7 @@ You can DM the bot directly, or @mention it in a channel.
 - Run `npm run build`
 - Start bridge and print QR login flow in terminal
 
-## Development
+## 🛠️ Development
 
 ```bash
 cargo fmt
@@ -555,6 +574,6 @@ cargo check --features dingtalk-stream
 cargo check --features qq-botrs
 ```
 
-## License
+## 📄 License
 
 MIT
