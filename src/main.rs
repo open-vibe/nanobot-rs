@@ -6,12 +6,15 @@ use nanobot::bus::{MessageBus, OutboundMessage};
 use nanobot::channels::manager::ChannelManager;
 use nanobot::config::{Config, get_config_path, load_config, providers_status, save_config};
 use nanobot::cron::{CronSchedule, CronService};
+use nanobot::health::{CheckLevel, HealthReport, check_update, collect_health, run_doctor};
 use nanobot::heartbeat::{DEFAULT_HEARTBEAT_INTERVAL_S, HeartbeatService};
+use nanobot::pairing::{approve_pairing, list_pending, reject_pairing};
 use nanobot::providers::base::LLMProvider;
 use nanobot::providers::litellm::LiteLLMProvider;
 use nanobot::service::{self, ServiceAccount, ServiceInstallOptions};
 use nanobot::session::SessionManager;
 use nanobot::utils::{get_data_path, get_workspace_path};
+use nanobot::webui::run_webui_server;
 use std::fs;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
@@ -32,6 +35,23 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Commands {
     Onboard,
+    Health {
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
+    Doctor {
+        #[arg(long, default_value_t = false)]
+        fix: bool,
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
+    Update,
+    Webui {
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(short, long, default_value_t = 18890)]
+        port: u16,
+    },
     Gateway {
         #[arg(short, long, default_value_t = 18790)]
         port: u16,
@@ -50,6 +70,14 @@ enum Commands {
         #[command(subcommand)]
         command: ChannelCommand,
     },
+    Pairing {
+        #[command(subcommand)]
+        command: PairingCommand,
+    },
+    Sessions {
+        #[command(subcommand)]
+        command: SessionCommand,
+    },
     Cron {
         #[command(subcommand)]
         command: CronCommand,
@@ -64,6 +92,26 @@ enum Commands {
 enum ChannelCommand {
     Status,
     Login,
+}
+
+#[derive(Debug, Subcommand)]
+enum PairingCommand {
+    List,
+    Approve { channel: String, code: String },
+    Reject { channel: String, code: String },
+}
+
+#[derive(Debug, Subcommand)]
+enum SessionCommand {
+    List,
+    Show {
+        session: String,
+        #[arg(short, long, default_value_t = 20)]
+        limit: usize,
+    },
+    Delete {
+        session: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -154,11 +202,17 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Onboard => cmd_onboard()?,
+        Commands::Health { json } => cmd_health(json)?,
+        Commands::Doctor { fix, json } => cmd_doctor(fix, json)?,
+        Commands::Update => cmd_update().await?,
+        Commands::Webui { host, port } => cmd_webui(&host, port)?,
         Commands::Status => cmd_status()?,
         Commands::Version => println!("nanobot-rs v{VERSION}"),
         Commands::Gateway { port, verbose } => cmd_gateway(port, verbose).await?,
         Commands::Agent { message, session } => cmd_agent(message, &session).await?,
         Commands::Channels { command } => cmd_channels(command).await?,
+        Commands::Pairing { command } => cmd_pairing(command)?,
+        Commands::Sessions { command } => cmd_sessions(command)?,
         Commands::Cron { command } => cmd_cron(command).await?,
         Commands::Service { command } => cmd_service(command)?,
     }
@@ -229,6 +283,99 @@ fn cmd_onboard() -> Result<()> {
     println!("1. Add your API key to {}", config_path.display());
     println!("2. Chat: nanobot-rs agent -m \"Hello!\"");
     Ok(())
+}
+
+fn check_level_tag(level: &CheckLevel) -> &'static str {
+    match level {
+        CheckLevel::Ok => "OK",
+        CheckLevel::Warn => "WARN",
+        CheckLevel::Fail => "FAIL",
+    }
+}
+
+fn print_health_report(report: &HealthReport) {
+    println!("Health Report @ {}", report.generated_at);
+    println!(
+        "Summary: ok={} warn={} fail={}",
+        report.summary.ok, report.summary.warn, report.summary.fail
+    );
+    for check in &report.checks {
+        println!(
+            "[{}] {} ({}) - {}",
+            check_level_tag(&check.level),
+            check.label,
+            check.id,
+            check.detail
+        );
+        if let Some(hint) = &check.fix_hint {
+            println!("      fix: {hint}");
+        }
+    }
+}
+
+fn cmd_health(json_output: bool) -> Result<()> {
+    let config = load_config(None).unwrap_or_default();
+    let report = collect_health(&config)?;
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        print_health_report(&report);
+    }
+    Ok(())
+}
+
+fn cmd_doctor(fix: bool, json_output: bool) -> Result<()> {
+    let result = run_doctor(fix)?;
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+        return Ok(());
+    }
+
+    if fix {
+        if result.actions.is_empty() {
+            println!("Doctor fix: no changes needed.");
+        } else {
+            println!("Doctor fix actions:");
+            for action in &result.actions {
+                println!("- {action}");
+            }
+        }
+    }
+    print_health_report(&result.report);
+    Ok(())
+}
+
+async fn cmd_update() -> Result<()> {
+    let report = check_update("nanobot").await?;
+    println!("Current: {}", report.current_version);
+    if let Some(latest) = &report.latest_version {
+        println!("Latest:  {latest}");
+    } else {
+        println!("Latest:  unknown");
+    }
+    if report.update_available {
+        println!("Update:  available");
+        println!("Hint: run `cargo install nanobot --locked --force`");
+    } else {
+        println!("Update:  up-to-date");
+    }
+    if let Some(err) = &report.registry_error {
+        println!("Registry check: {err}");
+    }
+    if report.git.inside_repo {
+        println!(
+            "Git: branch={} dirty={}",
+            report.git.branch.unwrap_or_else(|| "unknown".to_string()),
+            report.git.dirty.unwrap_or(false)
+        );
+    } else {
+        println!("Git: not a repository");
+    }
+    Ok(())
+}
+
+fn cmd_webui(host: &str, port: u16) -> Result<()> {
+    run_webui_server(host, port)
 }
 
 fn cmd_status() -> Result<()> {
@@ -888,6 +1035,92 @@ async fn cmd_channels(command: ChannelCommand) -> Result<()> {
         }
         ChannelCommand::Login => {
             cmd_channels_login().await?;
+        }
+    }
+    Ok(())
+}
+
+fn cmd_pairing(command: PairingCommand) -> Result<()> {
+    match command {
+        PairingCommand::List => {
+            let pending = list_pending()?;
+            if pending.is_empty() {
+                println!("No pending pairing requests.");
+                return Ok(());
+            }
+            println!("Pending pairing requests:");
+            for entry in pending {
+                println!(
+                    "- channel={} sender={} chat={} code={} requests={} last_seen_ms={}",
+                    entry.channel,
+                    entry.sender_id,
+                    entry.chat_id,
+                    entry.code,
+                    entry.request_count,
+                    entry.last_seen_at_ms
+                );
+            }
+        }
+        PairingCommand::Approve { channel, code } => {
+            let approved = approve_pairing(&channel, &code)?;
+            println!(
+                "Approved pairing: channel={} sender={} chat={} code={}",
+                approved.channel, approved.sender_id, approved.chat_id, approved.code
+            );
+            println!(
+                "Sender added to allowlist. You can verify with `nanobot-rs channels status` or config.json."
+            );
+        }
+        PairingCommand::Reject { channel, code } => {
+            if reject_pairing(&channel, &code)? {
+                println!("Rejected pairing request: channel={channel} code={code}");
+            } else {
+                println!("No pending pairing request found for channel={channel} code={code}");
+            }
+        }
+    }
+    Ok(())
+}
+
+fn cmd_sessions(command: SessionCommand) -> Result<()> {
+    let sessions = SessionManager::new()?;
+    match command {
+        SessionCommand::List => {
+            let keys = sessions.list_session_keys()?;
+            if keys.is_empty() {
+                println!("No sessions found.");
+            } else {
+                println!("Sessions:");
+                for key in keys {
+                    println!("- {key}");
+                }
+            }
+        }
+        SessionCommand::Show { session, limit } => {
+            let loaded = sessions.load_session(&session)?;
+            let start = loaded.messages.len().saturating_sub(limit);
+            println!("Session: {}", loaded.key);
+            println!("Messages: {}", loaded.messages.len());
+            for msg in &loaded.messages[start..] {
+                let role = msg
+                    .get("role")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                let content = msg
+                    .get("content")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .replace('\n', " ");
+                let ts = msg.get("timestamp").and_then(|v| v.as_str()).unwrap_or("-");
+                println!("[{}] {}: {}", ts, role, content);
+            }
+        }
+        SessionCommand::Delete { session } => {
+            if sessions.delete(&session) {
+                println!("Deleted session {session}");
+            } else {
+                println!("Session not found: {session}");
+            }
         }
     }
     Ok(())

@@ -1,6 +1,7 @@
 use crate::bus::{MessageBus, OutboundMessage};
 use crate::channels::base::Channel;
 use crate::config::DiscordConfig;
+use crate::pairing::{issue_pairing, pairing_prompt};
 use anyhow::Result;
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
@@ -59,6 +60,17 @@ impl DiscordChannel {
         }
 
         if !self.is_allowed(&sender_id) {
+            if let Ok(issue) = issue_pairing(self.name(), &sender_id, &channel_id) {
+                let prompt = pairing_prompt(&issue);
+                let _ = self
+                    .bus
+                    .publish_outbound(OutboundMessage::new(
+                        self.name(),
+                        channel_id.clone(),
+                        prompt,
+                    ))
+                    .await;
+            }
             return Ok(());
         }
 

@@ -1,6 +1,7 @@
 use crate::bus::{MessageBus, OutboundMessage};
 use crate::channels::base::Channel;
 use crate::config::SlackConfig;
+use crate::pairing::{issue_pairing, pairing_prompt};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
@@ -170,6 +171,18 @@ impl SlackChannel {
             .unwrap_or("")
             .to_string();
         if !self.is_allowed(&sender_id, &chat_id, &channel_type) {
+            if let Ok(issue) = issue_pairing(self.name(), &sender_id, &chat_id) {
+                let prompt = pairing_prompt(&issue);
+                let _ = self
+                    .post_slack_api(
+                        "chat.postMessage",
+                        json!({
+                            "channel": chat_id,
+                            "text": prompt,
+                        }),
+                    )
+                    .await;
+            }
             return Ok(());
         }
 

@@ -1,6 +1,7 @@
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::channels::base::{Channel, is_allowed_sender};
 use crate::config::MochatConfig;
+use crate::pairing::{issue_pairing, pairing_prompt};
 use crate::utils::get_data_path;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
@@ -392,6 +393,17 @@ async fn process_event(rt: &Runtime, target_id: &str, event: &Value, target_kind
         return;
     }
     if !is_allowed_sender(&author, &rt.config.allow_from) {
+        if let Ok(issue) = issue_pairing("mochat", &author, target_id) {
+            let prompt = pairing_prompt(&issue);
+            let _ = rt
+                .bus
+                .publish_outbound(OutboundMessage::new(
+                    "mochat",
+                    target_id.to_string(),
+                    prompt,
+                ))
+                .await;
+        }
         return;
     }
     let message_id = str_field(payload, &["messageId"]);

@@ -25,7 +25,7 @@ English: [README.en.md](README.en.md)
   - `read_file` / `write_file` / `edit_file` / `list_dir`
   - `exec`
   - `web_search` / `web_fetch` / `http_request`
-  - `message` / `spawn` / `cron`
+  - `message` / `spawn` / `cron` / `sessions_list` / `sessions_history` / `sessions_send`
   - `spawn` 子代理具备当前时间上下文、`edit_file` 能力与 `skills/` 路径提示
 - 定时任务与心跳：
   - `CronService`（add/list/remove/enable/run + 持久化）
@@ -41,6 +41,11 @@ English: [README.en.md](README.en.md)
   - Slack（Socket Mode）
   - QQ（可选特性，`qq-botrs`）
 - 内置 skills：同步原项目 `skills/*`
+- 运维与维护能力：
+  - `health` / `doctor --fix` / `update`
+  - `pairing list|approve|reject`（陌生私聊配对审批）
+  - `sessions list|show|delete`
+  - WebUI（`webui`）终端风格控制面板
 
 ## 环境要求
 
@@ -278,6 +283,14 @@ cargo run -- agent -m "Hello"
 cargo run -- gateway
 ```
 
+### 5. 启动 WebUI（terminal-cli 风格）
+
+```bash
+cargo run -- webui --host 127.0.0.1 --port 18890
+```
+
+然后访问 `http://127.0.0.1:18890`。
+
 ## Windows 服务（NSSM）
 
 `nanobot-rs` 支持通过 `nssm` 注册为 Windows 后台服务，并提供统一命令：
@@ -354,13 +367,30 @@ Remove-Item Env:NANOBOT_SERVICE_PASSWORD
 # 状态与版本
 cargo run -- status
 cargo run -- version
+cargo run -- health
+cargo run -- doctor
+cargo run -- doctor --fix
+cargo run -- update
 
 # 交互模式
 cargo run -- agent
 
+# WebUI
+cargo run -- webui
+
 # 渠道
 cargo run -- channels status
 cargo run -- channels login
+
+# 配对审批（陌生发送者）
+cargo run -- pairing list
+cargo run -- pairing approve telegram <CODE>
+cargo run -- pairing reject telegram <CODE>
+
+# 会话管理
+cargo run -- sessions list
+cargo run -- sessions show telegram:123456 --limit 30
+cargo run -- sessions delete telegram:123456
 
 # 定时任务
 cargo run -- cron list

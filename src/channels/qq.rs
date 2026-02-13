@@ -11,6 +11,8 @@ use crate::bus::InboundMessage;
 #[cfg(feature = "qq-botrs")]
 use crate::channels::base::is_allowed_sender;
 #[cfg(feature = "qq-botrs")]
+use crate::pairing::{issue_pairing, pairing_prompt};
+#[cfg(feature = "qq-botrs")]
 use botrs::models::message::C2CMessageParams;
 #[cfg(feature = "qq-botrs")]
 use botrs::{C2CMessage, Context as QQContext, EventHandler, Intents, Ready, Token};
@@ -74,6 +76,14 @@ impl EventHandler for QQEventHandler {
             return;
         }
         if !is_allowed_sender(&sender, &self.shared.allow_from) {
+            if let Ok(issue) = issue_pairing("qq", &sender, &sender) {
+                let prompt = pairing_prompt(&issue);
+                let _ = self
+                    .shared
+                    .bus
+                    .publish_outbound(OutboundMessage::new("qq", sender.clone(), prompt))
+                    .await;
+            }
             return;
         }
 

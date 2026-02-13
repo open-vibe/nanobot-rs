@@ -15,6 +15,8 @@ use crate::bus::InboundMessage;
 #[cfg(feature = "feishu-websocket")]
 use crate::channels::base::is_allowed_sender;
 #[cfg(feature = "feishu-websocket")]
+use crate::pairing::{issue_pairing, pairing_prompt};
+#[cfg(feature = "feishu-websocket")]
 use open_lark::client::ws_client::LarkWsClient;
 #[cfg(feature = "feishu-websocket")]
 use open_lark::prelude::{AppType, EventDispatcherHandler, LarkClient, P2ImMessageReceiveV1};
@@ -270,6 +272,16 @@ impl FeishuChannel {
 
                     let sender_id = sender.sender_id.open_id;
                     if !is_allowed_sender(&sender_id, &allow_from) {
+                        if let Ok(issue) = issue_pairing("feishu", &sender_id, &sender_id) {
+                            let prompt = pairing_prompt(&issue);
+                            let _ = bus
+                                .publish_outbound(OutboundMessage::new(
+                                    "feishu",
+                                    sender_id.clone(),
+                                    prompt,
+                                ))
+                                .await;
+                        }
                         return;
                     }
 

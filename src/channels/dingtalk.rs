@@ -18,6 +18,8 @@ use serde_json::Value;
 use tokio::sync::Mutex;
 #[cfg(feature = "dingtalk-stream")]
 use {crate::bus::InboundMessage, crate::channels::base::is_allowed_sender};
+#[cfg(feature = "dingtalk-stream")]
+use {crate::pairing::issue_pairing, crate::pairing::pairing_prompt};
 
 pub struct DingTalkChannel {
     config: DingTalkConfig,
@@ -136,6 +138,16 @@ impl Channel for DingTalkChannel {
                         sender_staff_id
                     };
                     if !is_allowed_sender(&sender, &allow_from) {
+                        if let Ok(issue) = issue_pairing("dingtalk", &sender, &sender) {
+                            let prompt = pairing_prompt(&issue);
+                            let _ = bus
+                                .publish_outbound(OutboundMessage::new(
+                                    "dingtalk",
+                                    sender.clone(),
+                                    prompt,
+                                ))
+                                .await;
+                        }
                         return Ok(());
                     }
 

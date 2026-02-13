@@ -4,6 +4,7 @@ use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -142,6 +143,7 @@ impl SessionManager {
         let mut lines = Vec::new();
         lines.push(serde_json::to_string(&json!({
             "_type": "metadata",
+            "key": session.key,
             "created_at": session.created_at.to_rfc3339(),
             "updated_at": session.updated_at.to_rfc3339(),
             "metadata": session.metadata,
@@ -170,6 +172,48 @@ impl SessionManager {
         }
     }
 
+    pub fn load_session(&self, key: &str) -> Result<Session> {
+        self.load(key)
+    }
+
+    pub fn list_session_keys(&self) -> Result<Vec<String>> {
+        let mut keys = Vec::new();
+        for entry in std::fs::read_dir(&self.sessions_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension() != Some(OsStr::new("jsonl")) {
+                continue;
+            }
+
+            let content = match std::fs::read_to_string(&path) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let mut restored_key = None::<String>;
+            if let Some(first_line) = content.lines().find(|line| !line.trim().is_empty())
+                && let Ok(value) = serde_json::from_str::<Value>(first_line)
+                && value.get("_type").and_then(Value::as_str) == Some("metadata")
+            {
+                restored_key = value
+                    .get("key")
+                    .and_then(Value::as_str)
+                    .map(ToOwned::to_owned);
+            }
+
+            let key = if let Some(key) = restored_key {
+                key
+            } else if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                stem.replace('_', ":")
+            } else {
+                continue;
+            };
+            keys.push(key);
+        }
+
+        keys.sort();
+        Ok(keys)
+    }
+
     fn load(&self, key: &str) -> Result<Session> {
         let path = self.session_path(key);
         let content = std::fs::read_to_string(&path)
@@ -183,6 +227,9 @@ impl SessionManager {
         {
             let value: Value = serde_json::from_str(line)?;
             if value.get("_type").and_then(Value::as_str) == Some("metadata") {
+                if let Some(saved_key) = value.get("key").and_then(Value::as_str) {
+                    session.key = saved_key.to_string();
+                }
                 if let Some(raw) = value.get("created_at").and_then(Value::as_str) {
                     if let Ok(ts) = DateTime::parse_from_rfc3339(raw) {
                         session.created_at = ts.with_timezone(&Local);

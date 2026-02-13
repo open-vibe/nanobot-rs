@@ -12,6 +12,7 @@ use crate::tools::filesystem::{EditFileTool, ListDirTool, ReadFileTool, WriteFil
 use crate::tools::http::HttpRequestTool;
 use crate::tools::message::MessageTool;
 use crate::tools::registry::ToolRegistry;
+use crate::tools::sessions::{SessionsHistoryTool, SessionsListTool, SessionsSendTool};
 use crate::tools::shell::ExecTool;
 use crate::tools::spawn::SpawnTool;
 use crate::tools::web::{WebFetchTool, WebSearchTool};
@@ -34,6 +35,7 @@ pub struct AgentLoop {
     sessions: Arc<SessionManager>,
     tools: ToolRegistry,
     message_tool: Arc<MessageTool>,
+    sessions_send_tool: Arc<SessionsSendTool>,
     spawn_tool: Arc<SpawnTool>,
     cron_tool: Option<Arc<CronTool>>,
     subagents: Arc<SubagentManager>,
@@ -148,6 +150,10 @@ impl AgentLoop {
 
         let message_tool = Arc::new(MessageTool::new(bus.outbound_sender()));
         tools.register(message_tool.clone());
+        tools.register(Arc::new(SessionsListTool::new(sessions.clone())));
+        tools.register(Arc::new(SessionsHistoryTool::new(sessions.clone())));
+        let sessions_send_tool = Arc::new(SessionsSendTool::new(bus.outbound_sender()));
+        tools.register(sessions_send_tool.clone());
 
         let subagents = Arc::new(SubagentManager::new(
             provider.clone(),
@@ -180,6 +186,7 @@ impl AgentLoop {
             sessions,
             tools,
             message_tool,
+            sessions_send_tool,
             spawn_tool,
             cron_tool,
             subagents,
@@ -264,6 +271,8 @@ impl AgentLoop {
             }
         }
         self.message_tool
+            .set_context(msg.channel.clone(), msg.chat_id.clone());
+        self.sessions_send_tool
             .set_context(msg.channel.clone(), msg.chat_id.clone());
         self.spawn_tool
             .set_context(msg.channel.clone(), msg.chat_id.clone());
@@ -391,6 +400,8 @@ impl AgentLoop {
             .unwrap_or_else(|| ("cli".to_string(), msg.chat_id.clone()));
 
         self.message_tool
+            .set_context(origin_channel.clone(), origin_chat_id.clone());
+        self.sessions_send_tool
             .set_context(origin_channel.clone(), origin_chat_id.clone());
         self.spawn_tool
             .set_context(origin_channel.clone(), origin_chat_id.clone());

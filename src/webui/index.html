@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="ui_title">nanobot-rs control ui</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+  <header class="header pane">
+    <div class="logo">NANOBOT-RS :: CONTROL_UI</div>
+    <div class="meta" id="meta-line" data-i18n="meta_boot_wait">[BOOT] waiting for state...</div>
+    <div class="actions">
+      <button id="refresh-btn" class="cmd-btn" type="button" data-i18n="btn_refresh">[ REFRESH ]</button>
+      <button id="copy-status-btn" class="cmd-btn" type="button" data-i18n="btn_copy_status">[ COPY STATUS ]</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="pane pane-chat" aria-labelledby="chat-title">
+      <h2 id="chat-title" data-i18n="section_chat">$ webchat</h2>
+      <div id="chat-log" class="chat-log list"></div>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-session" class="chat-input" type="text" value="webui:default" data-i18n-placeholder="chat_session_placeholder" />
+        <input id="chat-input" class="chat-input" type="text" data-i18n-placeholder="chat_input_placeholder" />
+        <button id="chat-send-btn" class="cmd-btn" type="submit" data-i18n="btn_send">[ SEND ]</button>
+      </form>
+    </section>
+
+    <section class="pane" aria-labelledby="sys-title">
+      <h2 id="sys-title" data-i18n="section_system">$ system.status</h2>
+      <pre id="system-status" class="terminal-block" data-i18n="loading_text">loading...</pre>
+    </section>
+
+    <section class="pane" aria-labelledby="health-title">
+      <h2 id="health-title" data-i18n="section_health">$ doctor.summary</h2>
+      <div id="health-counters" class="counter-row"></div>
+      <div id="health-checks" class="list"></div>
+    </section>
+
+    <section class="pane" aria-labelledby="channels-title">
+      <h2 id="channels-title" data-i18n="section_channels">$ channels.enabled</h2>
+      <div id="channels-list" class="list"></div>
+    </section>
+
+    <section class="pane" aria-labelledby="cron-title">
+      <h2 id="cron-title" data-i18n="section_cron">$ cron.jobs</h2>
+      <div id="cron-list" class="list"></div>
+    </section>
+
+    <section class="pane" aria-labelledby="sessions-title">
+      <h2 id="sessions-title" data-i18n="section_sessions">$ sessions.list</h2>
+      <div id="sessions-list" class="list"></div>
+    </section>
+
+    <section class="pane" aria-labelledby="pairing-title">
+      <h2 id="pairing-title" data-i18n="section_pairing">$ pairing.pending</h2>
+      <div id="pairing-list" class="list"></div>
+    </section>
+  </main>
+
+  <footer class="footer pane">
+    <span data-i18n="tip_doctor">tips: nanobot-rs doctor --fix</span>
+    <span data-i18n="tip_pairing">tips: nanobot-rs pairing list</span>
+    <span data-i18n="tip_cron">tips: nanobot-rs cron list --all</span>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

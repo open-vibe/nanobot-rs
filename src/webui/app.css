@@ -1,0 +1,280 @@
+:root {
+  --background: #0a0a0a;
+  --foreground: #33ff00;
+  --secondary: #ffb000;
+  --muted: #1f521f;
+  --accent: #33ff00;
+  --error: #ff3333;
+  --border: #1f521f;
+  --ok-bg: #0f2f0f;
+  --warn-bg: #362600;
+  --fail-bg: #3a0f0f;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: "JetBrains Mono", "Fira Code", "VT323", monospace;
+  background: var(--background);
+  color: var(--foreground);
+  line-height: 1.35;
+  min-height: 100vh;
+  overflow: hidden;
+  padding: 8px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.03) 0px,
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  z-index: 0;
+}
+
+.header,
+.footer,
+.pane {
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: rgba(10, 10, 10, 0.96);
+}
+
+.header,
+.footer {
+  margin: 0;
+  padding: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.logo {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 6px rgba(51, 255, 0, 0.4);
+}
+
+.meta {
+  margin-top: 4px;
+  color: var(--secondary);
+}
+
+.actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cmd-btn {
+  font: inherit;
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.cmd-btn:hover,
+.cmd-btn:focus-visible {
+  background: var(--foreground);
+  color: var(--background);
+  outline: none;
+}
+
+.layout {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.pane {
+  padding: 10px;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-chat {
+  grid-column: 1 / -1;
+}
+
+.pane h2 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.terminal-block {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: auto;
+  min-height: 0;
+}
+
+.counter-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.counter {
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+}
+
+.counter.ok {
+  background: var(--ok-bg);
+}
+
+.counter.warn {
+  background: var(--warn-bg);
+  color: var(--secondary);
+}
+
+.counter.fail {
+  background: var(--fail-bg);
+  color: var(--error);
+}
+
+.list {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.chat-log {
+  flex: 1;
+}
+
+.chat-line {
+  border: 1px solid var(--border);
+  padding: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-line.user {
+  border-color: var(--secondary);
+  color: var(--secondary);
+}
+
+.chat-line.assistant {
+  border-color: var(--foreground);
+  color: var(--foreground);
+}
+
+.chat-line.error {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.chat-form {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 6px;
+}
+
+.chat-input {
+  font: inherit;
+  color: var(--foreground);
+  background: rgba(10, 10, 10, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 5px 7px;
+}
+
+.chat-input:focus-visible {
+  outline: none;
+  border-color: var(--foreground);
+}
+
+.item {
+  border: 1px solid var(--border);
+  padding: 6px;
+}
+
+.item .title {
+  color: var(--foreground);
+}
+
+.item .sub {
+  color: var(--secondary);
+}
+
+.item.fail {
+  border-color: var(--error);
+}
+
+.item.warn {
+  border-color: var(--secondary);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+@media (max-width: 1280px) {
+  .layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  body {
+    overflow: auto;
+    grid-template-rows: auto auto auto;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    grid-auto-rows: minmax(160px, auto);
+  }
+
+  .chat-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

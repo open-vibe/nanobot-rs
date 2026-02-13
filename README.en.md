@@ -25,7 +25,7 @@
   - `read_file` / `write_file` / `edit_file` / `list_dir`
   - `exec`
   - `web_search` / `web_fetch` / `http_request`
-  - `message` / `spawn` / `cron`
+  - `message` / `spawn` / `cron` / `sessions_list` / `sessions_history` / `sessions_send`
   - `spawn` subagents include current-time context, `edit_file` capability, and `skills/` path guidance
 - Scheduling and heartbeat:
   - `CronService` (add/list/remove/enable/run + persistence)
@@ -41,6 +41,11 @@
   - Slack (Socket Mode)
   - QQ (optional feature `qq-botrs`)
 - Built-in skills synced from the original project (`skills/*`)
+- Ops and maintenance:
+  - `health` / `doctor --fix` / `update`
+  - `pairing list|approve|reject` (DM-style allowlist pairing workflow)
+  - `sessions list|show|delete`
+  - WebUI (`webui`) with terminal-cli style control dashboard
 
 ## Requirements
 
@@ -278,6 +283,14 @@ cargo run -- agent -m "Hello"
 cargo run -- gateway
 ```
 
+### 5. Start WebUI (terminal-cli style)
+
+```bash
+cargo run -- webui --host 127.0.0.1 --port 18890
+```
+
+Then open `http://127.0.0.1:18890`.
+
 ## Windows Service (NSSM)
 
 `nanobot-rs` can run as a Windows background service via `nssm`, with built-in commands:
@@ -354,13 +367,30 @@ Remove-Item Env:NANOBOT_SERVICE_PASSWORD
 # Status and version
 cargo run -- status
 cargo run -- version
+cargo run -- health
+cargo run -- doctor
+cargo run -- doctor --fix
+cargo run -- update
 
 # Interactive mode
 cargo run -- agent
 
+# WebUI
+cargo run -- webui
+
 # Channels
 cargo run -- channels status
 cargo run -- channels login
+
+# Pairing (approve unknown sender)
+cargo run -- pairing list
+cargo run -- pairing approve telegram <CODE>
+cargo run -- pairing reject telegram <CODE>
+
+# Sessions
+cargo run -- sessions list
+cargo run -- sessions show telegram:123456 --limit 30
+cargo run -- sessions delete telegram:123456
 
 # Cron jobs
 cargo run -- cron list
